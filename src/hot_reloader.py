@@ -40,14 +40,19 @@ class HotReloader(RegexMatchingEventHandler):
     if run(command).returncode == 0:
       print(f"{self.options['TARGET']} relinked")
       return True
-    
-    return False
+    else:
+      return False
 
   def recompile(self, node : CompilationGraphSimpleNode, build_target : bool) -> bool :
     if node.is_header:
+      compilation_ok = True
       for included_in in node.included_in:
-        if not self.recompile(included_in, False):
-          return False
+        if self.recompile(included_in, False):
+          self.compile_queue.remove(included_in.key)
+        else:
+          compilation_ok = False
+      if not compilation_ok:
+        return False
     else:
       if self.options["OBJ_DIR"]:
         makedirs(f"{self.options["OBJ_DIR"]}{sep}{path.dirname(get_relative_path_from(self.working_dir, node.key))}", exist_ok=True)
@@ -67,13 +72,24 @@ class HotReloader(RegexMatchingEventHandler):
 
       if run(command, stdout=None).returncode == 0:
         print(f"{node.key} recompiled")
-        return True
+        self.compile_queue.remove(node.key)
       else:
         print(f"{node.key} compilation error")
+        self.compile_queue.enqueue(node)
         return False
-    
+
     if build_target:
+      if not self.compile_queue.is_empty():
+        print("QUEUE TRIGGER")
+        compilation_queue_copy = CompilationQueue(self.compile_queue.queue_values.values())
+        compilation_ok = True
+        while outdated_node := compilation_queue_copy.dequeue():
+          compilation_ok = self.recompile(outdated_node, False)
+        if not compilation_ok:
+          return False
       return self.link_target()
+    
+    return True
 
   def on_created(self, fse: DirCreatedEvent | FileCreatedEvent) -> None:
     if fse.is_directory:
