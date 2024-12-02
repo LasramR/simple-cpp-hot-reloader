@@ -126,5 +126,21 @@ class CompilationGraph:
     return node
   
   def move_node(self, old_key : str, new_key : str) -> CompilationGraphSimpleNode :
-    self.remove_node(old_key)
-    return self.insert_node(new_key)
+    header_file_regex = file_ext_regex(self.options["HXX_FILE_EXTS"])
+    old_node = self.get_node(old_key)
+    new_node = CompilationGraphSimpleNode(new_key, not match(header_file_regex, new_key) is None)
+    links = get_all_includes_from_file(new_key, self.options["CFLAGS"], [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
+
+    for l in links:
+      if not l.startswith(self.working_dir):
+        continue
+      link_node = self.get_node(l)
+      new_node.includes.add(link_node)
+      link_node.included_in.add(new_node)
+      link_node.included_in.remove(old_node)
+
+    new_node.included_in = old_node.included_in
+    del self.nodes[old_key]
+    self.nodes[new_key] = new_node
+    
+    return new_node
