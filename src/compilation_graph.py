@@ -37,7 +37,7 @@ class CompilationGraph:
     self.working_dir = working_dir
     self.nodes : Dict[str, CompilationGraphSimpleNode]= {}
     self.visited = set()
-
+    
     header_file_regex = file_ext_regex(self.options["HXX_FILE_EXTS"])
     keys_to_visit = initial_keys_set
     while len(keys_to_visit):
@@ -81,4 +81,47 @@ class CompilationGraph:
   
   def get_node_included_in(self, key : str) -> Set[CompilationGraphSimpleNode]:
     return self.nodes[key].included_in
+  
+  def insert_node(self, key: str) -> CompilationGraphSimpleNode:
+    header_file_regex = file_ext_regex(self.options["HXX_FILE_EXTS"])
+  
+    links = get_all_includes_from_file(key, self.options["CFLAGS"], [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
+    self.nodes[key] = CompilationGraphSimpleNode(key, not match(header_file_regex, key) is None)
 
+    for l in links:
+      if not l.startswith(self.working_dir):
+        continue
+      if not l in self.nodes:
+        self.insert_node(l)
+      else:
+        self.nodes[l].included_in.add(self.nodes[key])
+      self.nodes[key].includes.add(self.nodes[l])
+
+    self.visited.add(key)
+
+    return self.nodes[key]
+  
+  def remove_node(self, key : str) -> None:
+    for includes in self.get_node_includes(key):
+      includes.included_in.remove(key)
+    for included_in in self.get_node_included_in(key):
+      included_in.includes.remove(key)
+    del self.nodes[key]
+  
+  def update_node(self, key : str) -> CompilationGraphSimpleNode:
+    node = self.get_node(key)
+    
+    node.includes.clear()
+    for included_in in node.included_in:
+      included_in.included_in.remove(node)
+
+    links = get_all_includes_from_file(node.key, self.options["CFLAGS"], [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
+
+    for l in links:
+      if not l.startswith(self.working_dir):
+        continue
+      link_node = self.get_node(l)
+      node.includes.add(link_node)
+      link_node.included_in.add(node)
+    
+    return node

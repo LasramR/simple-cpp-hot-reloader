@@ -3,7 +3,7 @@ from subprocess import run
 from signal import signal, SIGINT
 from typing import List
 
-from watchdog.events import RegexMatchingEventHandler, DirCreatedEvent, DirModifiedEvent, FileCreatedEvent, FileModifiedEvent
+from watchdog.events import DirDeletedEvent, FileDeletedEvent, RegexMatchingEventHandler, DirCreatedEvent, DirModifiedEvent, FileCreatedEvent, FileModifiedEvent
 from watchdog.observers import Observer
 
 from .options import SimpleCppHotReloaderOptions
@@ -59,11 +59,33 @@ class HotReloader(RegexMatchingEventHandler):
       self.cache.dump()
       self.link_target()
 
+  def on_created(self, fse: DirCreatedEvent | FileCreatedEvent) -> None:
+    if fse.is_directory:
+      return
+    
+    self.cache.add_entry(fse.src_path)
+    node = self.compile_graph.insert_node(fse.src_path)
+    print(f"{node.key} created")
+
+    if self.options["MODE"] == "AR":
+      self.recompile(node)
+    else:
+      self.compile_queue.enqueue(node)
+  
+  def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
+    if fse.is_directory:
+      return
+    
+    self.cache.remove_entry(fse.src_path)
+    self.compile_graph.remove_node(fse.src_path)
+    self.compile_queue.remove(fse.src_path)
+    print(f"{fse.src_path} deleted")
+
   def on_modified(self, fse : DirModifiedEvent | FileModifiedEvent):
     if fse.is_directory or self.cache.cache_table[fse.src_path].is_up_to_date():
       return
     
-    node = self.compile_graph.get_node(fse.src_path)
+    node = self.compile_graph.update_node(fse.src_path)
     print(f"{node.key} modified")
 
     if self.options["MODE"] == "AR":

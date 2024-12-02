@@ -10,7 +10,7 @@ class CompilationQueue:
   
   def enqueue(self, node: CompilationGraphSimpleNode):
     if node.key in self.queue_values:
-      self.queue.remove(node)
+      self.queue.remove(node.key)
     
     self.queue.append(node.key)
     self.queue_values[node.key] = node
@@ -19,5 +19,10 @@ class CompilationQueue:
     if len(self.queue) == 0:
       return None
     node = self.queue_values[self.queue.pop()]
-    self.queue_values.remove(node.key)
+    del self.queue_values[node.key]
     return node
+  
+  def remove(self, key: str) -> None :
+    if key in self.queue_values:
+      self.queue.remove(key)
+      del self.queue_values[key]
