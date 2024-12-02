@@ -13,6 +13,7 @@ __pycache__/
 cpp/
 bin/
 makefile*
+hello
 
 # CLI artifacts
 *.cache

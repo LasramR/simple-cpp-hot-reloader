@@ -43,16 +43,12 @@ class HotReloader(RegexMatchingEventHandler):
     else:
       return False
 
-  def recompile(self, node : CompilationGraphSimpleNode, build_target : bool) -> bool :
+  def recompile(self, build_target : bool) -> bool :
+    node = self.compile_queue.dequeue()
+
     if node.is_header:
-      compilation_ok = True
       for included_in in node.included_in:
-        if self.recompile(included_in, False):
-          self.compile_queue.remove(included_in.key)
-        else:
-          compilation_ok = False
-      if not compilation_ok:
-        return False
+        self.compile_queue.enqueue(included_in)
     else:
       if self.options["OBJ_DIR"]:
         makedirs(f"{self.options["OBJ_DIR"]}{sep}{path.dirname(get_relative_path_from(self.working_dir, node.key))}", exist_ok=True)
@@ -72,21 +68,17 @@ class HotReloader(RegexMatchingEventHandler):
 
       if run(command, stdout=None).returncode == 0:
         print(f"{node.key} recompiled")
-        self.compile_queue.remove(node.key)
       else:
         print(f"{node.key} compilation error")
         self.compile_queue.enqueue(node)
         return False
 
-    if build_target:
+    if not self.compile_queue.is_empty():
+      self.recompile(False)
       if not self.compile_queue.is_empty():
-        print("QUEUE TRIGGER")
-        compilation_queue_copy = CompilationQueue(self.compile_queue.queue_values.values())
-        compilation_ok = True
-        while outdated_node := compilation_queue_copy.dequeue():
-          compilation_ok = self.recompile(outdated_node, False)
-        if not compilation_ok:
-          return False
+        return False
+
+    if build_target:
       return self.link_target()
     
     return True
@@ -97,13 +89,12 @@ class HotReloader(RegexMatchingEventHandler):
     
     self.cache.add_entry(fse.src_path)
     node = self.compile_graph.insert_node(fse.src_path)
-    print(f"{node.key} created")
+    self.compile_queue.enqueue(node)
 
+    print(f"{node.key} created")
     if self.options["MODE"] == "AR":
-      if self.recompile(node, True):
+      if self.recompile(True):
         self.cache.dump()
-    else:
-      self.compile_queue.enqueue(node)
   
   def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
     if fse.is_directory:
@@ -123,14 +114,13 @@ class HotReloader(RegexMatchingEventHandler):
     
     self.compile_queue.remove(fse.src_path)
     self.cache.move_entry(fse.src_path, fse.dest_path)
-    node = self.compile_graph.move_node(fse.src_path, fse.dest_path)
+    node = self.compile_graph.move_node(fse.src_path, fse.dest_path)    
+    self.compile_queue.enqueue(node)
 
     print(f"{fse.src_path} moved to {fse.dest_path}")
     if self.options["MODE"] == "AR":
-      if self.recompile(node, True):
+      if self.recompile(True):
         self.cache.dump()
-    else:
-      self.compile_queue.enqueue(node)
 
   def on_modified(self, fse : DirModifiedEvent | FileModifiedEvent):
     if fse.is_directory or self.cache.cache_table[fse.src_path].is_up_to_date():
@@ -138,22 +128,18 @@ class HotReloader(RegexMatchingEventHandler):
 
     node = self.compile_graph.update_node(fse.src_path)
     self.cache.update_entry(node.key)
+    self.compile_queue.enqueue(node)
+    
+    if self.options["DEBUG"]:
+      print(f"{node.key} modified")
 
     if self.options["MODE"] == "AR":
-      if self.recompile(node, True):
+      if self.recompile(True):
         self.cache.dump()
-        
-    else:
-      self.compile_queue.enqueue(node)
 
   def start(self):
     if self.options["MODE"] == "AR" and not self.compile_queue.is_empty():
-      compilation_ok = True
-      while outdated := self.compile_queue.dequeue():
-        compilation_ok = self.recompile(outdated, False)
-        if not compilation_ok:
-          break
-      if compilation_ok:
+      if self.recompile(False):
         if self.link_target():
           self.cache.dump()
 
