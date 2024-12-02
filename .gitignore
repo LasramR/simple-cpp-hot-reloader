@@ -1,0 +1,20 @@
+# Python stuff
+.venv/
+
+# CPP stuff
+*.cpp
+*.cc
+*.c
+*.h
+*.hpp
+*.out
+*.o
+bin/
+src/
+makefile*
+
+# CLI artifacts
+*.cache
+
+# IDE
+.vscode/
