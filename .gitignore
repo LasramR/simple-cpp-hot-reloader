@@ -10,6 +10,7 @@ __pycache__/
 *.hpp
 *.out
 *.o
+cpp/
 bin/
 makefile*
 
