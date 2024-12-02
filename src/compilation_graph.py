@@ -1,7 +1,7 @@
 from __future__ import annotations
 from os import path
 from typing import Set, Dict, List
-from re import match
+from re import escape, match
 
 from .utils import file_ext_regex, run_piped_command
 from .options import SimpleCppHotReloaderOptions
@@ -14,19 +14,22 @@ class CompilationGraphSimpleNode:
     self.includes = set(includes)
     self.included_in = set(included_in)
 
-def get_all_includes_from_file(file_path : str, cflags : List[str], source_file_exts: List[str]) -> List[str] :
+def get_all_includes_from_file(file_path : str, cflags : str, source_file_exts: List[str]) -> List[str] :
   if not len(source_file_exts):
     raise ValueError("get_all_includes_from_file: source_file_ext must be a non empty list")
 
+  grepRegex = rf"\".*\.{source_file_exts.pop().strip('.')}\"" if len(source_file_exts) == 1 else rf"\".*\.({'|'.join(map(lambda e : e.strip('.'), source_file_exts))})\""
   commands = [
-    ["cpp", *cflags.split(' '), "-H", file_path],
-    ["grep", "-oP", file_ext_regex(source_file_exts)],
+    ["cpp", "-H", file_path, *cflags.split(' ')],
+    ["grep", "-oP", grepRegex],
     ["tr", "-d", "'\"'"],
     ["sort"],
     ["uniq"],
   ]
-  return list(map(lambda f : path.abspath(f.strip("\r\n")), run_piped_command(commands, True)[1:]))
-
+  
+  includes = list(map(lambda f : path.abspath(f), run_piped_command(commands)))
+  includes.remove(file_path)
+  return includes
 class CompilationGraph:
 
   def __init__(self, working_dir : str, initial_keys_set : List[str], options : SimpleCppHotReloaderOptions):
@@ -58,13 +61,13 @@ class CompilationGraph:
 
       self.visited.add(key)
       keys_to_visit = [*keys_to_visit, *links]
-
+      
   def get_node(self, key : str) -> CompilationGraphSimpleNode:
     return self.nodes[key]
 
-  def get_node_includes(self, key : str) -> CompilationGraphSimpleNode:
+  def get_node_includes(self, key : str) -> Set[CompilationGraphSimpleNode]:
     return self.nodes[key].includes
   
-  def get_node_included_in(self, key : str) -> CompilationGraphSimpleNode:
+  def get_node_included_in(self, key : str) -> Set[CompilationGraphSimpleNode]:
     return self.nodes[key].included_in
 

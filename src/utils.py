@@ -11,7 +11,8 @@ def run_piped_command(commands : List[List[str]], printCmd : bool = False) -> Li
   for c in commands:
     cp = Popen(c, stdin=prevStdout, stdout=PIPE, stderr=PIPE)
     prevStdout = cp.stdout
-  return list(map(lambda l : l.decode(), prevStdout.readlines()))
+
+  return list(map(lambda l : l.decode().strip("\n\r"), prevStdout.readlines()))
 
 def is_valid_shell_command(command : str) -> bool:
   try:

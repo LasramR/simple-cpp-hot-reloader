@@ -2,4 +2,4 @@
 
 WIP
 
-Usage: `python cli.py -t hello -c gcc -cf =-std=c++20 -od ./bin -ld=-lpthread`
+Usage: `python cli.py -t hello -c gcc -cf=-std=c++20 -od ./bin -ld=-lpthread`
