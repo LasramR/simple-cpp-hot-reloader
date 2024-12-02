@@ -51,6 +51,10 @@ class CompilationCache:
     if not artifact_path in self.cache_table:
       self.cache_table[artifact_path] = CompilationCacheArtifact(artifact_path)
 
+  def move_entry(self, old_artifact_path : str, new_artifact_path : str) -> None:
+    self.remove_entry(old_artifact_path)
+    self.add_entry(new_artifact_path)
+
   def get_all_outdated_artifacts(self) -> List[CompilationCacheArtifact]:
     outdated = []
     for cca in self.old_cache_table:

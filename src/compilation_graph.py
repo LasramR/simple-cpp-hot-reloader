@@ -102,18 +102,17 @@ class CompilationGraph:
     return self.nodes[key]
   
   def remove_node(self, key : str) -> None:
+    node = self.get_node(key)
     for includes in self.get_node_includes(key):
-      includes.included_in.remove(key)
+      includes.included_in.remove(node)
     for included_in in self.get_node_included_in(key):
-      included_in.includes.remove(key)
+      included_in.includes.remove(node)
     del self.nodes[key]
   
   def update_node(self, key : str) -> CompilationGraphSimpleNode:
     node = self.get_node(key)
     
     node.includes.clear()
-    for included_in in node.included_in:
-      included_in.included_in.remove(node)
 
     links = get_all_includes_from_file(node.key, self.options["CFLAGS"], [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
 
@@ -125,3 +124,7 @@ class CompilationGraph:
       link_node.included_in.add(node)
     
     return node
+  
+  def move_node(self, old_key : str, new_key : str) -> CompilationGraphSimpleNode :
+    self.remove_node(old_key)
+    return self.insert_node(new_key)

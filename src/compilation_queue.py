@@ -26,3 +26,6 @@ class CompilationQueue:
     if key in self.queue_values:
       self.queue.remove(key)
       del self.queue_values[key]
+
+  def is_empty(self) -> bool :
+    return len(self.queue_values) == 0

@@ -36,7 +36,8 @@ if __name__ == "__main__":
     "CXX_FILE_EXTS": [".cpp", ".cc", ".c"],
     "HXX_FILE_EXTS": [".hpp", ".h"],
     "TARGET": args.target,
-    "MODE": "AR"
+    "MODE": "AR",
+    "DEBUG": False
   }
 
   if cxx := args.compiler:
