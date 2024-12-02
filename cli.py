@@ -3,9 +3,9 @@
 from argparse import ArgumentParser
 from os import getcwd
 
-from .hot_reloader import HotReloader
-from .utils import is_valid_shell_command
-from .options import SimpleCppHotReloaderOptions
+from src.hot_reloader import HotReloader
+from src.utils import is_valid_shell_command
+from src.options import SimpleCppHotReloaderOptions
 
 if __name__ == "__main__":
   working_dir = getcwd()
@@ -41,6 +41,3 @@ if __name__ == "__main__":
     HotReloader(working_dir, hot_reload_options).start()
 
 # python cli.py -t hello -c gcc -cf =-std=c++20 -od ./bin -ld=-lpthread
-# Its currently broken so I use 
-# python -m src.simple-cpp-hot-reloader.cli -t hello -c gcc -cf=-std=c++20 -od ./bin -ld=-lpthread
-# Will need to fix that as the cli tool is supposed to be ran using the shebang
