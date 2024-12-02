@@ -61,7 +61,18 @@ class CompilationGraph:
 
       self.visited.add(key)
       keys_to_visit = [*keys_to_visit, *links]
-      
+
+  def get_all_nodes(self) -> List[CompilationGraphSimpleNode]:
+    return self.nodes.values()
+
+  def get_all_non_header_nodes(self) -> List[CompilationGraphSimpleNode]:
+    all_nodes = self.nodes.values()
+    non_header_nodes = set()
+    for node in all_nodes:
+      if not node.is_header:
+        non_header_nodes.add(node)
+    return non_header_nodes
+
   def get_node(self, key : str) -> CompilationGraphSimpleNode:
     return self.nodes[key]
 
