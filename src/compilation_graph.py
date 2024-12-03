@@ -85,28 +85,33 @@ class CompilationGraph:
   def insert_node(self, key: str) -> CompilationGraphSimpleNode:
     header_file_regex = file_ext_regex(self.options["HXX_FILE_EXTS"])
   
-    links = get_all_includes_from_file(key, self.options["CFLAGS"], [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
-    self.nodes[key] = CompilationGraphSimpleNode(key, not match(header_file_regex, key) is None)
+    new_node = CompilationGraphSimpleNode(key, not match(header_file_regex, key) is None)
+    self.nodes[key] = new_node
+    
+    if new_node.is_header:
+      for node in self.get_all_nodes():
+        self.update_node(node.key)
 
+    links = get_all_includes_from_file(key, self.options["CFLAGS"], [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
     for l in links:
       if not l.startswith(self.working_dir):
         continue
       if not l in self.nodes:
         self.insert_node(l)
       else:
-        self.nodes[l].included_in.add(self.nodes[key])
-      self.nodes[key].includes.add(self.nodes[l])
+        self.nodes[l].included_in.add(new_node)
+      new_node.includes.add(self.nodes[l])
 
     self.visited.add(key)
 
-    return self.nodes[key]
+    return new_node
   
   def remove_node(self, key : str) -> None:
     node = self.get_node(key)
     for includes in self.get_node_includes(key):
-      includes.included_in.remove(node)
+      includes.included_in.discard(node)
     for included_in in self.get_node_included_in(key):
-      included_in.includes.remove(node)
+      included_in.includes.discard(node)
     del self.nodes[key]
   
   def update_node(self, key : str) -> CompilationGraphSimpleNode:
@@ -127,7 +132,6 @@ class CompilationGraph:
   
   def move_node(self, old_key : str, new_key : str) -> CompilationGraphSimpleNode :
     header_file_regex = file_ext_regex(self.options["HXX_FILE_EXTS"])
-    old_node = self.get_node(old_key)
     if new_key not in self.nodes:
       self.nodes[new_key] = CompilationGraphSimpleNode(new_key, not match(header_file_regex, new_key) is None)
     new_node = self.get_node(new_key)
@@ -154,3 +158,10 @@ class CompilationGraph:
       self.nodes[new_key] = new_node
     
     return new_node
+  
+  def get_all_sub_nodes(self, key_prefix : str) -> List[CompilationGraphSimpleNode] :
+    sub_nodes = []
+    for node in self.nodes.values():
+      if node.key.startswith(key_prefix):
+        sub_nodes.append(node)
+    return sub_nodes

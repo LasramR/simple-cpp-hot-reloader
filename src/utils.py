@@ -59,3 +59,4 @@ def get_all_files_in_dir(working_dir : str, filter_exts : List[str] = [], return
         matching_files.append(file)
   
   return matching_files
+

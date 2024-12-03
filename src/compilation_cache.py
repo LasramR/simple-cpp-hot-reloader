@@ -57,9 +57,9 @@ class CompilationCache:
 
   def get_all_outdated_artifacts(self) -> List[CompilationCacheArtifact]:
     outdated = []
-    for cca in self.old_cache_table:
-      if cca in self.cache_table and self.old_cache_table[cca].hash_cache != self.cache_table[cca].hash_cache:
-        outdated.append(self.old_cache_table[cca])
+    for cca in self.cache_table:
+      if not (cca in self.old_cache_table and self.old_cache_table[cca].hash_cache == self.cache_table[cca].hash_cache):
+        outdated.append(self.cache_table[cca])
     return outdated
 
   def dump(self):

@@ -1,9 +1,10 @@
-from os import sep, makedirs, path
+from os import sep, makedirs, path, remove, rmdir, listdir
 from subprocess import run
+from re import match
 from signal import signal, SIGINT
 from typing import List
 
-from watchdog.events import DirDeletedEvent, DirMovedEvent, FileDeletedEvent, FileMovedEvent, RegexMatchingEventHandler, DirCreatedEvent, DirModifiedEvent, FileCreatedEvent, FileModifiedEvent
+from watchdog.events import DirDeletedEvent, DirMovedEvent, FileDeletedEvent, FileMovedEvent, FileSystemEvent, RegexMatchingEventHandler, DirCreatedEvent, DirModifiedEvent, FileCreatedEvent, FileModifiedEvent
 from watchdog.observers import Observer
 
 from .options import SimpleCppHotReloaderOptions
@@ -22,7 +23,8 @@ class HotReloader(RegexMatchingEventHandler):
     self.cache = CompilationCache(f"{self.working_dir}{sep}.simple-cpp-hr.cache", watched_files)
     self.compile_graph = CompilationGraph(self.working_dir, watched_files, self.options)
     self.compile_queue = CompilationQueue([self.compile_graph.get_node(cca.file_path) for cca in self.cache.get_all_outdated_artifacts()])
-    super().__init__(regexes=file_ext_regex([*self.options['CXX_FILE_EXTS'], *self.options['HXX_FILE_EXTS']]))
+    self.filter_path_regex = file_ext_regex([*self.options['CXX_FILE_EXTS'], *self.options['HXX_FILE_EXTS']])
+    super().__init__()
 
   def link_target(self) -> bool :
     command = [
@@ -82,9 +84,25 @@ class HotReloader(RegexMatchingEventHandler):
       return self.link_target()
     
     return True
+  
+  def delete_node_compilation_artifact(self, node : CompilationGraphSimpleNode) -> None :
+    node_object_file_path = f"{change_file_ext(node.key, '.o')}" if self.options["OBJ_DIR"] == None else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}"
+    try:
+      remove(node_object_file_path)
+    except:
+      pass
+    try:
+      node_object_dir_path = path.dirname(node_object_file_path)
+      if not self.options["OBJ_DIR"] is None and len(listdir(node_object_dir_path)) == 0:
+        rmdir(node_object_dir_path)
+    except:
+      pass
 
   def on_created(self, fse: DirCreatedEvent | FileCreatedEvent) -> None:
     if fse.is_synthetic or fse.is_directory:
+      return
+    
+    if match(self.filter_path_regex, fse.src_path) is None:
       return
     
     self.cache.add_entry(fse.src_path)
@@ -97,22 +115,37 @@ class HotReloader(RegexMatchingEventHandler):
         self.cache.dump()
   
   def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
+    deleted_nodes = []
     if fse.is_synthetic or fse.is_directory:
+      deleted_nodes = self.compile_graph.get_all_sub_nodes(fse.src_path)
+      if len(deleted_nodes) == 0:
+        return
+    elif match(self.filter_path_regex, fse.src_path) is None:
       return
-    
-    self.cache.remove_entry(fse.src_path)
-    self.compile_graph.remove_node(fse.src_path)
-    self.compile_queue.remove(fse.src_path)
+    else:
+      deleted_nodes = [self.compile_graph.get_node(fse.src_path)]
 
-    print(f"{fse.src_path} deleted")
+    for node in deleted_nodes:
+      self.cache.remove_entry(node.key)
+      self.delete_node_compilation_artifact(node)
+      for included_in in node.included_in:
+        self.compile_queue.enqueue(included_in)
+      self.compile_graph.remove_node(node.key)
+      self.compile_queue.remove(node.key)
 
-    self.cache.dump()
+    if self.compile_queue.is_empty() or self.recompile(True):
+      self.cache.dump()
+
 
   def on_moved(self, fse: DirMovedEvent | FileMovedEvent) -> None:
+    if match(self.filter_path_regex, fse.src_path) is None:
+      return
+    
     print(f"{fse.src_path} moved to {fse.dest_path}")
 
     self.compile_queue.remove(fse.src_path)
     self.cache.move_entry(fse.src_path, fse.dest_path)
+    self.delete_node_compilation_artifact(self.compile_graph.get_node(fse.src_path))
     node = self.compile_graph.move_node(fse.src_path, fse.dest_path)
     print(node.key)
     self.compile_queue.enqueue(node)
@@ -122,9 +155,12 @@ class HotReloader(RegexMatchingEventHandler):
         self.cache.dump()
 
   def on_modified(self, fse : DirModifiedEvent | FileModifiedEvent):
-    if fse.is_directory or fse.is_synthetic or self.cache.cache_table[fse.src_path].is_up_to_date():
+    if fse.is_directory or fse.is_synthetic:
       return
 
+    if match(self.filter_path_regex, fse.src_path) is None or self.cache.cache_table[fse.src_path].is_up_to_date():
+      return
+    
     node = self.compile_graph.update_node(fse.src_path)
     self.cache.update_entry(node.key)
     self.compile_queue.enqueue(node)
