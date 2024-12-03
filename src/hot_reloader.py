@@ -20,9 +20,22 @@ class HotReloader(RegexMatchingEventHandler):
     self.options = options
 
     watched_files =  get_all_files_in_dir(self.working_dir, [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
-    self.cache = CompilationCache(f"{self.working_dir}{sep}.simple-cpp-hr.cache", watched_files)
+
     self.compile_graph = CompilationGraph(self.working_dir, watched_files, self.options)
-    self.compile_queue = CompilationQueue([self.compile_graph.get_node(cca.file_path) for cca in self.cache.get_all_outdated_artifacts()])
+    
+    initialQueueSet = set()
+    for node in self.compile_graph.get_all_non_header_nodes():
+      node_object_file_path = f"{change_file_ext(node.key, '.o')}" if self.options["OBJ_DIR"] == None else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}"
+      if not path.exists(node_object_file_path):
+        initialQueueSet.add(node)
+
+    self.compilation_cache = CompilationCache(f"{self.working_dir}{sep}.simple-cpp-hr.cache", watched_files)
+    
+    for outdated_cca in self.compilation_cache.get_all_outdated_artifacts():
+      initialQueueSet.add(self.compile_graph.get_node(outdated_cca.file_path))
+
+    self.compile_queue = CompilationQueue(list(initialQueueSet))
+
     self.filter_path_regex = file_ext_regex([*self.options['CXX_FILE_EXTS'], *self.options['HXX_FILE_EXTS']])
     super().__init__()
 
@@ -105,14 +118,14 @@ class HotReloader(RegexMatchingEventHandler):
     if match(self.filter_path_regex, fse.src_path) is None:
       return
     
-    self.cache.add_entry(fse.src_path)
+    self.compilation_cache.add_entry(fse.src_path)
     node = self.compile_graph.insert_node(fse.src_path)
     self.compile_queue.enqueue(node)
 
     print(f"{node.key} created")
     if self.options["MODE"] == "AR":
       if self.recompile(True):
-        self.cache.dump()
+        self.compilation_cache.dump()
   
   def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
     deleted_nodes = []
@@ -126,7 +139,7 @@ class HotReloader(RegexMatchingEventHandler):
       deleted_nodes = [self.compile_graph.get_node(fse.src_path)]
 
     for node in deleted_nodes:
-      self.cache.remove_entry(node.key)
+      self.compilation_cache.remove_entry(node.key)
       self.delete_node_compilation_artifact(node)
       for included_in in node.included_in:
         self.compile_queue.enqueue(included_in)
@@ -134,7 +147,7 @@ class HotReloader(RegexMatchingEventHandler):
       self.compile_queue.remove(node.key)
 
     if self.compile_queue.is_empty() or self.recompile(True):
-      self.cache.dump()
+      self.compilation_cache.dump()
 
 
   def on_moved(self, fse: DirMovedEvent | FileMovedEvent) -> None:
@@ -144,7 +157,7 @@ class HotReloader(RegexMatchingEventHandler):
     print(f"{fse.src_path} moved to {fse.dest_path}")
 
     self.compile_queue.remove(fse.src_path)
-    self.cache.move_entry(fse.src_path, fse.dest_path)
+    self.compilation_cache.move_entry(fse.src_path, fse.dest_path)
     self.delete_node_compilation_artifact(self.compile_graph.get_node(fse.src_path))
     node = self.compile_graph.move_node(fse.src_path, fse.dest_path)
     print(node.key)
@@ -152,17 +165,17 @@ class HotReloader(RegexMatchingEventHandler):
 
     if self.options["MODE"] == "AR":
       if self.recompile(True):
-        self.cache.dump()
+        self.compilation_cache.dump()
 
   def on_modified(self, fse : DirModifiedEvent | FileModifiedEvent):
     if fse.is_directory or fse.is_synthetic:
       return
 
-    if match(self.filter_path_regex, fse.src_path) is None or self.cache.cache_table[fse.src_path].is_up_to_date():
+    if match(self.filter_path_regex, fse.src_path) is None or self.compilation_cache.cache_table[fse.src_path].is_up_to_date():
       return
     
     node = self.compile_graph.update_node(fse.src_path)
-    self.cache.update_entry(node.key)
+    self.compilation_cache.update_entry(node.key)
     self.compile_queue.enqueue(node)
     
     if self.options["DEBUG"]:
@@ -170,13 +183,13 @@ class HotReloader(RegexMatchingEventHandler):
 
     if self.options["MODE"] == "AR":
       if self.recompile(True):
-        self.cache.dump()
+        self.compilation_cache.dump()
 
   def start(self):
     if self.options["MODE"] == "AR" and not self.compile_queue.is_empty():
       if self.recompile(False):
         if self.link_target():
-          self.cache.dump()
+          self.compilation_cache.dump()
 
     observer = Observer()
     observer.schedule(self, self.working_dir, recursive=True)
