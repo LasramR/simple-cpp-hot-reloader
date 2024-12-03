@@ -65,5 +65,8 @@ class CompilationCache:
   def dump(self):
     with open(self.compilation_cache_file_path, "w") as fd:
       for cca in self.cache_table:
-        fd.write(f"{cca}:{self.cache_table[cca].hash()}\n")
+        try:
+          fd.write(f"{cca}:{self.cache_table[cca].hash()}\n")
+        except:
+          pass
     self.old_cache_table = self.cache_table

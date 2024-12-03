@@ -84,7 +84,7 @@ class HotReloader(RegexMatchingEventHandler):
     return True
 
   def on_created(self, fse: DirCreatedEvent | FileCreatedEvent) -> None:
-    if fse.is_directory:
+    if fse.is_synthetic or fse.is_directory:
       return
     
     self.cache.add_entry(fse.src_path)
@@ -97,7 +97,7 @@ class HotReloader(RegexMatchingEventHandler):
         self.cache.dump()
   
   def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
-    if fse.is_directory:
+    if fse.is_synthetic or fse.is_directory:
       return
     
     self.cache.remove_entry(fse.src_path)
@@ -109,21 +109,20 @@ class HotReloader(RegexMatchingEventHandler):
     self.cache.dump()
 
   def on_moved(self, fse: DirMovedEvent | FileMovedEvent) -> None:
-    if fse.is_directory:
-      return
-    
+    print(f"{fse.src_path} moved to {fse.dest_path}")
+
     self.compile_queue.remove(fse.src_path)
     self.cache.move_entry(fse.src_path, fse.dest_path)
-    node = self.compile_graph.move_node(fse.src_path, fse.dest_path)    
+    node = self.compile_graph.move_node(fse.src_path, fse.dest_path)
+    print(node.key)
     self.compile_queue.enqueue(node)
 
-    print(f"{fse.src_path} moved to {fse.dest_path}")
     if self.options["MODE"] == "AR":
       if self.recompile(True):
         self.cache.dump()
 
   def on_modified(self, fse : DirModifiedEvent | FileModifiedEvent):
-    if fse.is_directory or self.cache.cache_table[fse.src_path].is_up_to_date():
+    if fse.is_directory or fse.is_synthetic or self.cache.cache_table[fse.src_path].is_up_to_date():
       return
 
     node = self.compile_graph.update_node(fse.src_path)
