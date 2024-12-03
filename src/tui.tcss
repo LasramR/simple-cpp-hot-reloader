@@ -1,0 +1,10 @@
+Screen {
+    layout: horizontal;
+}
+
+.box {
+    height: 30%;
+    border: solid white;
+    width: 50%;
+    overflow-y: auto;
+}

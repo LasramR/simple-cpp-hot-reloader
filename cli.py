@@ -25,6 +25,8 @@ if __name__ == "__main__":
   argsParser.add_argument("-ld", "--ldflags", action=EqualAssignedArgument, nargs='*', metavar='="LFLAGS ..."', help='CPP Compiler linker flags, use it with direct affectation and quoted strings (e.g. "-ld=-lpthread")', required=False)
   argsParser.add_argument("-od", "--obj-dir", help="Object files output directory", required=False)
   argsParser.add_argument("-t", "--target", help="Target executable name", required=True)
+  # TODO add a flag to print out a nice make command :)
+  # TODO add a flag to print the dependency graph of the cpp project ? 
 
   args = argsParser.parse_args()
 
