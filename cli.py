@@ -48,4 +48,4 @@ if __name__ == "__main__":
   if od := args.obj_dir:
     hot_reload_options["OBJ_DIR"] = od
   
-    HotReloader(working_dir, hot_reload_options).start()
+  HotReloader(working_dir, hot_reload_options).start()
