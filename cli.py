@@ -11,12 +11,12 @@ from src.options import SimpleCppHotReloaderOptions
 
 class EqualAssignedArgument(Action):
 
-    def __call__(self, parser : ArgumentParser, namespace, raw_values : List[str], option_string : str):
-        value = ' '.join(raw_values)
-        raw_arg = next((arg for arg in argv if arg.startswith(option_string)), None)
-        if not raw_arg.startswith(f"{option_string}="):
-          raise parser.error(f'invalid {option_string} usage, the value must be directly assigned using \'=\' (e.g. {option_string}="-std=c++20 -I.").')
-        setattr(namespace, self.dest, value)
+  def __call__(self, parser : ArgumentParser, namespace, raw_values : List[str], option_string : str):
+    value = ' '.join(raw_values)
+    raw_arg = next((arg for arg in argv if arg.startswith(option_string)), None)
+    if not raw_arg.startswith(f"{option_string}="):
+      raise parser.error(f'invalid {option_string} usage, the value must be directly assigned using \'=\' (e.g. {option_string}="-std=c++20 -I.").')
+    setattr(namespace, self.dest, value)
 
 class AlphabeticalCharactersCombinationArgument(Action):
    
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     "TARGET": args.target,
     "TARGET_ARGS": args.target_args or "",
     "MODE": args.mode or "CR",
-    "DEBUG": False
+    "DEBUG": True
   }
 
   if cxx := args.compiler:

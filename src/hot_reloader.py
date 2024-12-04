@@ -2,6 +2,8 @@ from os import sep, makedirs, path, remove, rmdir, listdir
 from subprocess import run, Popen, PIPE
 from re import match
 from signal import signal, SIGINT
+from threading import Thread
+from typing import IO
 
 from watchdog.events import DirDeletedEvent, DirMovedEvent, FileDeletedEvent, FileMovedEvent, FileSystemEvent, RegexMatchingEventHandler, DirCreatedEvent, DirModifiedEvent, FileCreatedEvent, FileModifiedEvent
 from watchdog.observers import Observer
@@ -11,12 +13,14 @@ from .compilation_cache import CompilationCache
 from .compilation_graph import CompilationGraph, CompilationGraphSimpleNode
 from .compilation_queue import CompilationQueue
 from .utils import get_all_files_in_dir, change_file_ext, get_relative_path_from, file_ext_regex
+from .logger import Logger, LoggerOptions
 
 class HotReloader(RegexMatchingEventHandler):
 
   def __init__(self, working_dir : str, options : SimpleCppHotReloaderOptions):
     self.working_dir = working_dir
     self.options = options
+    self.logger = Logger(LoggerOptions.DefaultWithName("schr"))
 
     watched_files =  get_all_files_in_dir(self.working_dir, [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
 
@@ -36,22 +40,58 @@ class HotReloader(RegexMatchingEventHandler):
     self.compile_queue = CompilationQueue(list(initialQueueSet))
 
     self.target_child_process = None
+    self.target_logger = Logger({"NAME": self.options["TARGET"], "INFO_COLOR": "WHITE", "ERROR_COLOR": "MAGENTA", "WARN_COLOR": "YELLOW"})
+    self.target_monitor_thread = None
 
     self.filter_path_regex = file_ext_regex([*self.options['CXX_FILE_EXTS'], *self.options['HXX_FILE_EXTS']])
     super().__init__()
 
+  def print_target_output(self, stream : IO[str], error_stream : bool) -> None:
+    try:
+      for line in iter(stream.readline, ''):
+        if error_stream:
+          self.target_logger.error(line.strip())
+        else:
+          self.target_logger.info(line.strip())
+    finally:
+      stream.close()
+
+  def monitor_target(self) -> None:
+    if self.target_child_process is None:
+      return
+    
+    target_stdout_thread = Thread(target=self.print_target_output, args=(self.target_child_process.stdout, False))
+    target_stderr_thread = Thread(target=self.print_target_output, args=(self.target_child_process.stderr, True))
+
+    target_stdout_thread.start()
+    target_stderr_thread.start()
+
+    target_exit_code = self.target_child_process.wait()
+    target_stdout_thread.join()
+    target_stderr_thread.join()
+
+    self.logger.warn(f"Target {self.options['TARGET']} return with exit code {target_exit_code}.")
+    self.target_child_process = None
+
   def run_target(self) -> bool :
-    if not self.target_child_process is None and not self.target_child_process.poll() is None:
+    if not self.target_child_process is None:
       self.target_child_process.terminate()
-      self.target_child_process.wait() 
+      
+      if not self.target_monitor_thread is None and self.target_monitor_thread.is_alive():
+        self.target_monitor_thread.join()
+
+      self.target_monitor_thread = None
       self.target_child_process = None
+      self.logger.warn(f"target {self.options["TARGET"]} terminated by force")
 
     target_executable_path = path.abspath(path.join(self.working_dir, self.options["TARGET"]))
     
     command = [target_executable_path, *(self.options["TARGET_ARGS"].split(" ") if len(self.options["TARGET_ARGS"]) else [])]
 
-    print(f'restarting target: "{" ".join(command)}"')
+    self.logger.info(f'restarting target: "{" ".join(command)}"')
     self.target_child_process = Popen(command, stdout=PIPE, stderr=PIPE, text=True)
+    self.target_monitor_thread = Thread(target=self.monitor_target)
+    self.target_monitor_thread.start()
 
   def link_target(self) -> bool :
     command = [
@@ -64,12 +104,13 @@ class HotReloader(RegexMatchingEventHandler):
     ]
 
     if self.options["DEBUG"]:
-      print(" ".join(command))
+      self.logger.info(" ".join(command))
 
     if run(command).returncode == 0:
-      print(f"{self.options['TARGET']} relinked")
+      self.logger.info(f"target {self.options['TARGET']} relinked")
       return True
     else:
+      self.logger.error(f"target {self.options['TARGET']} linking error")
       return False
 
   def recompile(self, build_target : bool) -> bool :
@@ -93,12 +134,12 @@ class HotReloader(RegexMatchingEventHandler):
       ]
 
       if self.options["DEBUG"]:
-        print(" ".join(command))
+        self.logger.info(" ".join(command))
 
       if run(command, stdout=None).returncode == 0:
-        print(f"{node.key} recompiled")
+        self.logger.info(f"{node.key} recompiled")
       else:
-        print(f"{node.key} compilation error")
+        self.logger.error(f"{node.key} compilation error")
         self.compile_queue.enqueue(node)
         return False
 
@@ -136,10 +177,12 @@ class HotReloader(RegexMatchingEventHandler):
     node = self.compile_graph.insert_node(fse.src_path)
     self.compile_queue.enqueue(node)
 
-    print(f"{node.key} created")
+    self.logger.info(f"{node.key} created")
     if "C" in self.options["MODE"]:
       if self.recompile(True):
         self.compilation_cache.dump()
+        if "R" in self.options["MODE"]:
+          self.run_target()
   
   def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
     deleted_nodes = []
@@ -160,26 +203,31 @@ class HotReloader(RegexMatchingEventHandler):
       self.compile_graph.remove_node(node.key)
       self.compile_queue.remove(node.key)
 
-    if self.compile_queue.is_empty() or self.recompile(True):
-      self.compilation_cache.dump()
+    if self.compile_queue.is_empty():
+        self.compilation_cache.dump()
+        if "C" in self.options["MODE"]:
+          self.recompile(True)
+          if "R" in self.options["MODE"]:
+            self.run_target()
 
 
   def on_moved(self, fse: DirMovedEvent | FileMovedEvent) -> None:
     if match(self.filter_path_regex, fse.src_path) is None:
       return
     
-    print(f"{fse.src_path} moved to {fse.dest_path}")
+    self.logger.warn(f"{fse.src_path} moved to {fse.dest_path}")
 
     self.compile_queue.remove(fse.src_path)
     self.compilation_cache.move_entry(fse.src_path, fse.dest_path)
     self.delete_node_compilation_artifact(self.compile_graph.get_node(fse.src_path))
     node = self.compile_graph.move_node(fse.src_path, fse.dest_path)
-    print(node.key)
     self.compile_queue.enqueue(node)
 
     if "C" in self.options["MODE"]:
       if self.recompile(True):
         self.compilation_cache.dump()
+        if "R" in self.options["MODE"]:
+          self.run_target()  
 
   def on_modified(self, fse : DirModifiedEvent | FileModifiedEvent):
     if fse.is_directory or fse.is_synthetic:
@@ -193,11 +241,13 @@ class HotReloader(RegexMatchingEventHandler):
     self.compile_queue.enqueue(node)
     
     if self.options["DEBUG"]:
-      print(f"{node.key} modified")
+      self.logger.info(f"{node.key} modified")
 
     if "C" in self.options["MODE"]:
       if self.recompile(True):
         self.compilation_cache.dump()
+        if "R" in self.options["MODE"]:
+          self.run_target()  
 
   def start(self):
     if "C" in self.options["MODE"]:
