@@ -254,6 +254,9 @@ class HotReloader(RegexMatchingEventHandler):
       if self.compile_queue.is_empty() or self.recompile(True):
         self.compilation_cache.dump()
 
+    if self.options["MODE"] == "R":
+      self.logger.warn("You are using R (Run) mode only. This will only start your target once and only if it is already compiled. If that’s all you’re after, then you're all set—no compilation, no re-linking, just a good old execution!")
+
     if "R" in self.options["MODE"] and path.exists(path.abspath(path.join(self.working_dir, self.options["TARGET"]))):
       self.run_target()            
 
