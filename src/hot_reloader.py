@@ -240,8 +240,7 @@ class HotReloader(RegexMatchingEventHandler):
     self.compilation_cache.update_entry(node.key)
     self.compile_queue.enqueue(node)
     
-    if self.options["DEBUG"]:
-      self.logger.info(f"{node.key} modified")
+    self.logger.info(f"{node.key} modified")
 
     if "C" in self.options["MODE"]:
       if self.recompile(True):

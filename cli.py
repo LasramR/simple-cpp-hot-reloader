@@ -62,7 +62,7 @@ class ModeCharactersCombination (AlphabeticalCharactersCombinationArgument):
 if __name__ == "__main__":
   working_dir = getcwd()
 
-  argsParser = ArgumentParser(description="Simple CPP Hot Reloader", formatter_class=RawTextHelpFormatter)
+  argsParser = ArgumentParser(description="Simple CPP Hot Reloader (schr)", formatter_class=RawTextHelpFormatter)
   argsParser.add_argument("-c", "--compiler", help="C compiler executable\ndefaults to g++", required=False)
   argsParser.add_argument("-cf", "--cflags", action=EqualAssignedArgument, nargs='*', metavar='="CFLAGS ..."', help='CPP Compiler flags, use it with direct affectation and quoted strings (e.g. "-cf=-std=c++20")', required=False)
   argsParser.add_argument("-ld", "--ldflags", action=EqualAssignedArgument, nargs='*', metavar='="LFLAGS ..."', help='CPP Compiler linker flags, use it with direct affectation and quoted strings (e.g. "-ld=-lpthread")', required=False)
@@ -70,6 +70,7 @@ if __name__ == "__main__":
   argsParser.add_argument("-t", "--target", help="Target executable name", required=True)
   argsParser.add_argument("-ta", "--target-args", action=EqualAssignedArgument, nargs='*', metavar='="TARGET_ARGS ..."', help="Arguments passed to target when restarted", required=False)
   argsParser.add_argument("-m", "--mode", action=ModeCharactersCombination, help='A combination of characters describing the hot reloader behaviour:\n\tC - Automatically recompile on changes\n\tR - Restart the target after each build\ne.g. "-m CR" will enable both automatic compilation and restart\ndefaults to "CR"', required=False)
+  argsParser.add_argument("-d", "--debug", action='store_true', help="Enable debug mode. Compilation commands will be printed", required=False)
   # TODO add a flag to print out a nice make command :)
   # TODO add a flag to print the dependency graph of the cpp project ? 
 
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     "TARGET": args.target,
     "TARGET_ARGS": args.target_args or "",
     "MODE": args.mode or "CR",
-    "DEBUG": True
+    "DEBUG": args.debug
   }
 
   if cxx := args.compiler:
