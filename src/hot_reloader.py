@@ -1,8 +1,7 @@
 from os import sep, makedirs, path, remove, rmdir, listdir
-from subprocess import run
+from subprocess import run, Popen, PIPE
 from re import match
 from signal import signal, SIGINT
-from typing import List
 
 from watchdog.events import DirDeletedEvent, DirMovedEvent, FileDeletedEvent, FileMovedEvent, FileSystemEvent, RegexMatchingEventHandler, DirCreatedEvent, DirModifiedEvent, FileCreatedEvent, FileModifiedEvent
 from watchdog.observers import Observer
@@ -36,8 +35,23 @@ class HotReloader(RegexMatchingEventHandler):
 
     self.compile_queue = CompilationQueue(list(initialQueueSet))
 
+    self.target_child_process = None
+
     self.filter_path_regex = file_ext_regex([*self.options['CXX_FILE_EXTS'], *self.options['HXX_FILE_EXTS']])
     super().__init__()
+
+  def run_target(self) -> bool :
+    if not self.target_child_process is None and not self.target_child_process.poll() is None:
+      self.target_child_process.terminate()
+      self.target_child_process.wait() 
+      self.target_child_process = None
+
+    target_executable_path = path.abspath(path.join(self.working_dir, self.options["TARGET"]))
+    
+    command = [target_executable_path, *(self.options["TARGET_ARGS"].split(" ") if len(self.options["TARGET_ARGS"]) else [])]
+
+    print(f'restarting target: "{" ".join(command)}"')
+    self.target_child_process = Popen(command, stdout=PIPE, stderr=PIPE, text=True)
 
   def link_target(self) -> bool :
     command = [
@@ -123,7 +137,7 @@ class HotReloader(RegexMatchingEventHandler):
     self.compile_queue.enqueue(node)
 
     print(f"{node.key} created")
-    if self.options["MODE"] == "AR":
+    if "C" in self.options["MODE"]:
       if self.recompile(True):
         self.compilation_cache.dump()
   
@@ -163,7 +177,7 @@ class HotReloader(RegexMatchingEventHandler):
     print(node.key)
     self.compile_queue.enqueue(node)
 
-    if self.options["MODE"] == "AR":
+    if "C" in self.options["MODE"]:
       if self.recompile(True):
         self.compilation_cache.dump()
 
@@ -181,15 +195,17 @@ class HotReloader(RegexMatchingEventHandler):
     if self.options["DEBUG"]:
       print(f"{node.key} modified")
 
-    if self.options["MODE"] == "AR":
+    if "C" in self.options["MODE"]:
       if self.recompile(True):
         self.compilation_cache.dump()
 
   def start(self):
-    if self.options["MODE"] == "AR" and not self.compile_queue.is_empty():
-      if self.recompile(False):
-        if self.link_target():
-          self.compilation_cache.dump()
+    if "C" in self.options["MODE"]:
+      if self.compile_queue.is_empty() or self.recompile(True):
+        self.compilation_cache.dump()
+
+    if "R" in self.options["MODE"] and path.exists(path.abspath(path.join(self.working_dir, self.options["TARGET"]))):
+      self.run_target()            
 
     observer = Observer()
     observer.schedule(self, self.working_dir, recursive=True)

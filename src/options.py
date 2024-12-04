@@ -8,5 +8,6 @@ class SimpleCppHotReloaderOptions(TypedDict):
     CXX_FILE_EXTS: List[str]
     HXX_FILE_EXTS: List[str]
     TARGET: str
-    MODE: Union[Literal["AR"]]
+    TARGET_ARGS: str
+    MODE: str
     DEBUG: bool
