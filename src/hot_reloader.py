@@ -24,16 +24,16 @@ class HotReloader(RegexMatchingEventHandler):
 
     watched_files =  get_all_files_in_dir(self.working_dir, [*self.options["CXX_FILE_EXTS"], *self.options["HXX_FILE_EXTS"]])
 
-    self.compile_graph = CompilationGraph(self.working_dir, watched_files, self.options)
+    self.compile_graph = CompilationGraph(self.working_dir, watched_files.copy(), self.options)
     
     initialQueueSet = set()
     for node in self.compile_graph.get_all_non_header_nodes():
-      node_object_file_path = f"{change_file_ext(node.key, '.o')}" if self.options["OBJ_DIR"] == None else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}"
+      node_object_file_path = f"{change_file_ext(node.key, '.o')}" if not len(self.options["OBJ_DIR"]) else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}"
       if not path.exists(node_object_file_path):
         initialQueueSet.add(node)
 
-    self.compilation_cache = CompilationCache(f"{self.working_dir}{sep}.simple-cpp-hr.cache", watched_files)
-    
+    self.compilation_cache = CompilationCache(f"{self.working_dir}{sep}.simple-cpp-hr.cache", watched_files.copy())
+
     for outdated_cca in self.compilation_cache.get_all_outdated_artifacts():
       initialQueueSet.add(self.compile_graph.get_node(outdated_cca.file_path))
 
@@ -99,7 +99,7 @@ class HotReloader(RegexMatchingEventHandler):
       *(self.options["CFLAGS"].split(" ") or []),
       "-o",
       self.options["TARGET"],
-      *[f"{change_file_ext(node.key, '.o')}" if self.options["OBJ_DIR"] == None else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}" for node in self.compile_graph.get_all_non_header_nodes()],
+      *[f"{change_file_ext(node.key, '.o')}" if not len(self.options["OBJ_DIR"]) else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}" for node in self.compile_graph.get_all_non_header_nodes()],
       *(self.options["LDFLAGS"].split(" ") or [])
     ]
 
@@ -120,7 +120,7 @@ class HotReloader(RegexMatchingEventHandler):
       for included_in in node.included_in:
         self.compile_queue.enqueue(included_in)
     else:
-      if self.options["OBJ_DIR"]:
+      if len(self.options["OBJ_DIR"]):
         makedirs(f"{self.options["OBJ_DIR"]}{sep}{path.dirname(get_relative_path_from(self.working_dir, node.key))}", exist_ok=True)
     
       command = [
@@ -129,7 +129,7 @@ class HotReloader(RegexMatchingEventHandler):
         "-c",
         node.key,
         "-o",
-        f"{change_file_ext(node.key, '.o')}" if self.options["OBJ_DIR"] == None else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}",
+        f"{change_file_ext(node.key, '.o')}" if not len(self.options["OBJ_DIR"]) else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}",
         *(self.options["LDFLAGS"].split(" ") or [])
       ]
 
@@ -154,14 +154,14 @@ class HotReloader(RegexMatchingEventHandler):
     return True
   
   def delete_node_compilation_artifact(self, node : CompilationGraphSimpleNode) -> None :
-    node_object_file_path = f"{change_file_ext(node.key, '.o')}" if self.options["OBJ_DIR"] == None else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}"
+    node_object_file_path = f"{change_file_ext(node.key, '.o')}" if not len(self.options["OBJ_DIR"]) else f"{self.options["OBJ_DIR"]}{sep}{change_file_ext(get_relative_path_from(self.working_dir, node.key), '.o')}"
     try:
       remove(node_object_file_path)
     except:
       pass
     try:
       node_object_dir_path = path.dirname(node_object_file_path)
-      if not self.options["OBJ_DIR"] is None and len(listdir(node_object_dir_path)) == 0:
+      if len(self.options["OBJ_DIR"]) and len(listdir(node_object_dir_path)) == 0:
         rmdir(node_object_dir_path)
     except:
       pass
@@ -198,18 +198,8 @@ class HotReloader(RegexMatchingEventHandler):
     for node in deleted_nodes:
       self.compilation_cache.remove_entry(node.key)
       self.delete_node_compilation_artifact(node)
-      for included_in in node.included_in:
-        self.compile_queue.enqueue(included_in)
       self.compile_graph.remove_node(node.key)
       self.compile_queue.remove(node.key)
-
-    if self.compile_queue.is_empty():
-        self.compilation_cache.dump()
-        if "C" in self.options["MODE"]:
-          self.recompile(True)
-          if "R" in self.options["MODE"]:
-            self.run_target()
-
 
   def on_moved(self, fse: DirMovedEvent | FileMovedEvent) -> None:
     if match(self.filter_path_regex, fse.src_path) is None:
@@ -249,6 +239,7 @@ class HotReloader(RegexMatchingEventHandler):
           self.run_target()  
 
   def start(self):
+    print(self.working_dir)
     if "C" in self.options["MODE"]:
       if self.compile_queue.is_empty() or self.recompile(True):
         self.compilation_cache.dump()

@@ -7,11 +7,11 @@ from typing import List
 
 from src.hot_reloader import HotReloader
 from src.utils import is_valid_shell_command
-from src.options import SimpleCppHotReloaderOptions
+from src.options import SimpleCppHotReloaderOptions, as_makefile
 
 class EqualAssignedArgument(Action):
 
-  def __call__(self, parser : ArgumentParser, namespace, raw_values : List[str], option_string : str):
+  def __call__(self, parser : ArgumentParser, namespace : Namespace, raw_values : List[str], option_string : str):
     value = ' '.join(raw_values)
     raw_arg = next((arg for arg in argv if arg.startswith(option_string)), None)
     if not raw_arg.startswith(f"{option_string}="):
@@ -26,7 +26,7 @@ class AlphabeticalCharactersCombinationArgument(Action):
   UPPER_DEFAULT = False
   LOWER_DEFAULT = False
 
-  def __call__(self, parser : ArgumentParser, namespace, raw_values : List[str], option_string : str):
+  def __call__(self, parser : ArgumentParser, namespace : Namespace, raw_values : List[str], option_string : str):
     if self.UPPER_DEFAULT == True and self.LOWER_DEFAULT == True:
       raise ValueError("AlphabeticalCharactersCombinationArgument.__call__: could not use both UPPER_DEFAULT and LOWER_DEFAULT modes at the same time")
     
@@ -71,30 +71,31 @@ if __name__ == "__main__":
   argsParser.add_argument("-ta", "--target-args", action=EqualAssignedArgument, nargs='*', metavar='="TARGET_ARGS ..."', help="Arguments passed to target when restarted", required=False)
   argsParser.add_argument("-m", "--mode", action=ModeCharactersCombination, help='A combination of characters describing the hot reloader behaviour:\n\tC - Automatically recompile on changes\n\tR - Restart the target after each build\ne.g. "-m CR" will enable both automatic compilation and restart\ndefaults to "CR"', required=False)
   argsParser.add_argument("-d", "--debug", action='store_true', help="Enable debug mode. Compilation commands will be printed", required=False)
-  # TODO add a flag to print out a nice make command :)
-  # TODO add a flag to print the dependency graph of the cpp project ? 
-
+  argsParser.add_argument("--makefile", action='store_true', help="Print the source code of a makefile that can be used to execute schr with the provided arguments", required=False)
   args = argsParser.parse_args()
 
-  hot_reload_options : SimpleCppHotReloaderOptions = {
+  hot_reloader_options = SimpleCppHotReloaderOptions({
     "CXX": "g++",
     "CFLAGS": args.cflags or "",
     "LDFLAGS": args.ldflags or "",
-    "OBJ_DIR": None,
+    "OBJ_DIR": "",
     "CXX_FILE_EXTS": [".cpp", ".cc", ".c"],
     "HXX_FILE_EXTS": [".hpp", ".h"],
     "TARGET": args.target,
     "TARGET_ARGS": args.target_args or "",
     "MODE": args.mode or "CR",
     "DEBUG": args.debug
-  }
+  })
 
   if cxx := args.compiler:
     if not is_valid_shell_command(cxx):
       argsParser.error('invalid -c usage, please provide a valid compiler (e.g. "g++", "clang++").')
-    hot_reload_options["CXX"] = cxx
+    hot_reloader_options["CXX"] = cxx
 
   if od := args.obj_dir:
-    hot_reload_options["OBJ_DIR"] = od
+    hot_reloader_options["OBJ_DIR"] = od
 
-  HotReloader(working_dir, hot_reload_options).start()
+  if args.makefile:
+    print(as_makefile(hot_reloader_options))
+    exit(0)
+  HotReloader(working_dir, hot_reloader_options).start()
