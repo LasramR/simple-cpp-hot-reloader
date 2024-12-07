@@ -26,12 +26,11 @@ class CompilationGraphSimpleNode:
       self._compilation_process = AsyncProcess(
         self._compilation_graph._cpp.get_compile_command(self.key),
         self._compilation_graph._logger,
-        monitor_stdout=self._compilation_graph._options["DEBUG"],
         monitor_stderr=True,
+        raw_stderr=True,
         success_callback=self._on_compilation_success,
         error_callack=self._on_compilation_error,
-        success_exit_code=0,
-        debug=self._compilation_graph._options["DEBUG"]
+        log_command=self._compilation_graph._options["DEBUG"],
       )
 
   def _on_compilation_success(self) -> None :
@@ -40,7 +39,7 @@ class CompilationGraphSimpleNode:
     self._compilation_graph._link_target()
 
   def _on_compilation_error(self) -> None :
-    self._compilation_graph._logger.info(f"{self.key} compilation error")
+    self._compilation_graph._logger.error(f"{self.key} compilation error")
     self._compilation_graph._weighted_lock.release(self.key)
     self._compilation_graph._compilation_queue.enqueue(self)
 
@@ -73,12 +72,13 @@ class CompilationGraph:
     self._link_process = AsyncProcess(
       self._cpp.get_link_command([]),
       self._logger,
-      monitor_stdout=self._options["DEBUG"],
+      monitor_stdout=False,
       monitor_stderr=True,
       success_callback=self._on_link_success,
       error_callack=self._on_link_error,
       success_exit_code=0,
-      debug=self._options["DEBUG"]
+      log_command=True,
+      debug=False
     )
 
     keys_to_visit = self._cpp.get_cpp_source_file()
@@ -191,18 +191,15 @@ class CompilationGraph:
     return moved_node
   
   def _on_link_success(self) -> None : 
-    self._logger.info(f"target {self.options['TARGET']} relinked")
+    self._logger.info(f"target {self._options['TARGET']} relinked")
   
   def _on_link_error(self) -> None :
-    self._logger.error(f"target {self.options['TARGET']} linking error")
+    self._logger.error(f"target {self._options['TARGET']} linking error")
 
 
   def _link_target(self) -> None :
     if self._weighted_lock.is_fully_released() and self._compilation_queue.is_empty():
       command = self._cpp.get_link_command(list(map(lambda n: n.object_file_path, self.get_all_non_header_nodes())))
-
-      if self._options["DEBUG"]:
-        self._logger.info(" ".join(command))
 
       self._link_process.terminate()
       self._link_process.run_with_command(command)

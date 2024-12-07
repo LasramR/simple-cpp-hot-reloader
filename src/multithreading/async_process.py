@@ -14,13 +14,16 @@ class AsyncProcess:
   _success_callback : Union[Callable[[], None], None]
   _error_callback : Union[Callable[[], None], None]
 
-  def __init__(self, command : List[str], logger : Union[Logger, None] , monitor_stdout : bool = False, monitor_stderr : bool = False, success_callback : Callable[[], None] = None, error_callack : Callable[[], None] = None, success_exit_code : int = 0, debug : bool = True):
+  def __init__(self, command : List[str], logger : Union[Logger, None] , monitor_stdout : bool = False, monitor_stderr : bool = False, success_callback : Callable[[], None] = None, error_callack : Callable[[], None] = None, success_exit_code : int = 0, log_command : bool = False, debug : bool = True, raw_stdout : bool = False, raw_stderr : bool = False):
     self.command = command
     self.logger = logger
-    self.monitor_stdout = not self.logger is None and monitor_stdout
-    self.monitor_stderr = not self.logger is None and monitor_stderr
+    self.monitor_stdout = monitor_stdout
+    self.monitor_stderr = monitor_stderr
+    self.raw_stdout = raw_stdout
+    self.raw_stderr = raw_stderr
     self.success_exit_code = success_exit_code
     self.debug = debug
+    self.log_command = log_command
 
     self._success_callback = success_callback
     self._error_callback = error_callack
@@ -39,9 +42,12 @@ class AsyncProcess:
     if self.debug:
       self.logger.info(f'starting process: "{" ".join(self.command)}"')
     
+    if self.log_command:
+      self.logger.info(' '.join(self.command))
+
     self._command_thread = Thread(
       target=self._watch_process,
-      args=[Popen(self.command, stdout=PIPE if self.monitor_stdout else None, stderr=PIPE if self.monitor_stderr else None, text=True)]
+      args=[Popen(self.command, stdout=PIPE, stderr=PIPE, text=True)]
     )
     self._command_thread.start()
 
@@ -51,17 +57,20 @@ class AsyncProcess:
 
   def terminate(self) -> None:
     self._trigger_callback = False
-    if self._command_thread is None or not self._command_thread.is_alive():
+    if self._command_thread is None:
       self._command_thread = None
+      self._trigger_callback = True
       return
     
     if self._command_process:
       self._command_process.terminate()
+
+    if self._command_thread.is_alive():
       self._command_thread.join()
-      self._command_thread = None
     
     if self.debug:
       self.logger.info(f'process "{" ".join(self.command)}" terminated by force')
+
     self._trigger_callback = True
 
   def terminate_and_run(self) -> None:
@@ -74,13 +83,15 @@ class AsyncProcess:
     
     stream_threads : List[Thread] = []
     if self.monitor_stdout:
-      stream_threads.append(Thread(target=self._watch_process, args=[self._command_process.stdout, self.logger, False]))
+      stream_threads.append(Thread(target=self._watch_stream, args=[self._command_process.stdout, False]))
     if self.monitor_stderr:
-      stream_threads.append(Thread(target=self._watch_process, args=[self._command_process.stderr, self.logger, True]))
+      stream_threads.append(Thread(target=self._watch_stream, args=[self._command_process.stderr, True]))
 
-    map(lambda t : t.start(), stream_threads)
+    for t in stream_threads:
+      t.start()
     exit_code = self._command_process.wait()
-    map(lambda t : t.join(), stream_threads)
+    for t in stream_threads:
+      t.join()
 
     if self.debug:
       self.logger.warn(f'process "{" ".join(self.command)}" returned with exit code {exit_code}.')
@@ -93,14 +104,20 @@ class AsyncProcess:
       elif not self._error_callback is None and self.success_exit_code != exit_code:
         self._error_callback()
 
-  def _watch_stream(self, stream : IO[str], logger: Logger, is_error_stream : bool = False) -> None :
-    try:
-      for line in iter(stream.readline(), ''):
-        log = line.strip()
-        if is_error_stream:
-          logger.error(log)
-        else:
-          logger.info(log)
+  def _watch_stream(self, stream : IO[str], is_error_stream : bool = False) -> None :
 
+    try:
+      for line in iter(stream.readline, ''):
+        line = line.strip()
+        if is_error_stream:
+          if self.raw_stderr:
+            print(line)
+          else:
+            self.logger.error(line)
+        else:
+          if self.raw_stdout:
+            print(line)
+          else:
+            self.logger.error(line)
     finally:
       stream.close()
