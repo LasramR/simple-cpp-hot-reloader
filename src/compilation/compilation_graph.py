@@ -37,7 +37,7 @@ class CompilationGraphSimpleNode:
   def _on_compilation_success(self) -> None :
     self._compilation_graph._logger.info(f"{self.key} recompiled")
     self._compilation_graph._weighted_lock.release(self.key)
-    self._compilation_graph._link_executable()
+    self._compilation_graph._link_target()
 
   def _on_compilation_error(self) -> None :
     self._compilation_graph._logger.info(f"{self.key} compilation error")

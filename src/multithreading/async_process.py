@@ -62,7 +62,7 @@ class AsyncProcess:
     
     if self.debug:
       self.logger.info(f'process "{" ".join(self.command)}" terminated by force')
-
+    self._trigger_callback = True
 
   def terminate_and_run(self) -> None:
     if not self._command_thread is None:

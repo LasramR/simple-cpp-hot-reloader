@@ -16,10 +16,12 @@ class WeightedLock:
   def acquire(self, id : str):
     with self._lock:
       if not id in self._acquired_ids:
+        self._acquired_ids.add(id)
         self._counter += 1
 
   def release(self, id : str):
     with self._lock:
+      print(self._acquired_ids)
       if id in self._acquired_ids:
         self._acquired_ids.remove(id)
         self._counter -= 1
