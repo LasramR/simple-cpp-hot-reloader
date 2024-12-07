@@ -1,6 +1,7 @@
 from typing import List, Union, TypedDict
 
 class SimpleCppHotReloaderOptions(TypedDict):
+  WORKING_DIR: str
   CXX: str
   CFLAGS: Union[str, None]
   LDFLAGS: Union[str, None]

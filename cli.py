@@ -6,7 +6,7 @@ from sys import argv
 from typing import List
 
 from src.hot_reloader import HotReloader
-from src.utils import is_valid_shell_command
+from src.utils.cmd import is_valid_command
 from src.options import SimpleCppHotReloaderOptions, as_makefile
 
 class EqualAssignedArgument(Action):
@@ -60,8 +60,6 @@ class ModeCharactersCombination (AlphabeticalCharactersCombinationArgument):
 
 
 if __name__ == "__main__":
-  working_dir = getcwd()
-
   argsParser = ArgumentParser(description="Simple CPP Hot Reloader (schr)", formatter_class=RawTextHelpFormatter)
   argsParser.add_argument("-c", "--compiler", help="C compiler executable\ndefaults to g++", required=False)
   argsParser.add_argument("-cf", "--cflags", action=EqualAssignedArgument, nargs='*', metavar='="CFLAGS ..."', help='CPP Compiler flags, use it with direct affectation and quoted strings (e.g. "-cf=-std=c++20")', required=False)
@@ -75,6 +73,7 @@ if __name__ == "__main__":
   args = argsParser.parse_args()
 
   hot_reloader_options = SimpleCppHotReloaderOptions({
+    "WORKING_DIR": getcwd(),
     "CXX": "g++",
     "CFLAGS": args.cflags or "",
     "LDFLAGS": args.ldflags or "",
@@ -88,7 +87,7 @@ if __name__ == "__main__":
   })
 
   if cxx := args.compiler:
-    if not is_valid_shell_command(cxx):
+    if not is_valid_command(cxx):
       argsParser.error('invalid -c usage, please provide a valid compiler (e.g. "g++", "clang++").')
     hot_reloader_options["CXX"] = cxx
 
@@ -98,4 +97,5 @@ if __name__ == "__main__":
   if args.makefile:
     print(as_makefile(hot_reloader_options))
     exit(0)
-  HotReloader(working_dir, hot_reloader_options).start()
+
+  HotReloader(hot_reloader_options).start()
