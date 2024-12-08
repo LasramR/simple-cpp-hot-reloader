@@ -25,12 +25,11 @@ class CompilationGraphSimpleNode:
     if not self.is_header:
       self._compilation_process = AsyncProcess(
         self._compilation_graph._cpp.get_compile_command(self.key),
-        self._compilation_graph._logger,
-        monitor_stderr=True,
-        raw_stderr=True,
-        success_callback=self._on_compilation_success,
-        error_callack=self._on_compilation_error,
-        log_command=self._compilation_graph._options["DEBUG"],
+        {
+          "stderr_logger": print,
+          "on_success": self._on_compilation_success,
+          "on_error": self._on_compilation_error
+        }
       )
 
   def _on_compilation_success(self) -> None :
@@ -71,14 +70,11 @@ class CompilationGraph:
     self._weighted_lock = WeightedLock()
     self._link_process = AsyncProcess(
       self._cpp.get_link_command([]),
-      self._logger,
-      monitor_stdout=False,
-      monitor_stderr=True,
-      success_callback=self._on_link_success,
-      error_callack=self._on_link_error,
-      success_exit_code=0,
-      log_command=True,
-      debug=False
+      {
+        "on_success": self._on_link_success,
+        "on_error": self._on_link_error,
+        "stderr_logger": print
+      }
     )
 
     keys_to_visit = self._cpp.get_cpp_source_file()
@@ -90,6 +86,10 @@ class CompilationGraph:
       new_node = self.get_node(key) or self.insert_node(key, True)
 
       keys_to_visit = [*keys_to_visit, *[node.key for node in new_node.includes]]
+
+    for node in self.get_all_non_header_nodes():
+      if not self._cpp.is_compiled(node.key):
+        self._compilation_queue.enqueue(node)
 
   def has_node(self, key : str) -> bool :
     return key in self._nodes
@@ -200,7 +200,6 @@ class CompilationGraph:
   def _link_target(self) -> None :
     if self._weighted_lock.is_fully_released() and self._compilation_queue.is_empty():
       command = self._cpp.get_link_command(list(map(lambda n: n.object_file_path, self.get_all_non_header_nodes())))
-
       self._link_process.terminate()
       self._link_process.run_with_command(command)
 
