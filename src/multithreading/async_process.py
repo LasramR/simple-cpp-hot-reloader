@@ -83,7 +83,7 @@ class AsyncProcess:
       t.join()
 
     if "logger" in self._options:
-      self._options["logger"](f'process "{" ".join(self._options["name"])}" returned with exit code {exit_code}.')
+      self._options["logger"](f'process "{self._options["name"]}" returned with exit code {exit_code}.')
     
     if self._trigger_callback:
       if exit_code == 0 and "on_success" in self._options: 

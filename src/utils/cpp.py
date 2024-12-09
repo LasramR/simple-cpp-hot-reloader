@@ -1,5 +1,5 @@
 from os import sep, makedirs
-from os.path import abspath, exists, dirname
+from os.path import abspath, exists, dirname, join
 from re import match
 from typing import List
 
@@ -68,7 +68,7 @@ class CppUtils  :
       *object_file_paths,
       *(self._options["LDFLAGS"].split(" ") or [])
     ]
-  
+   
   def get_source_includes(self, cpp_source_path : str) -> List[str] :
     commands = [
       self.get_cpp_command(cpp_source_path),
@@ -90,3 +90,13 @@ class CppUtils  :
 
   def is_compiled(self, cpp_source_path : str) -> bool :
     return exists(self.get_object_file_path(cpp_source_path))
+  
+  def get_target_command(self) -> List[str] :
+    return [
+      abspath(join(self._options["WORKING_DIR"], self._options["TARGET"])),
+      *(self._options["TARGET_ARGS"].split(" ") or []),
+    ]
+
+  def is_target_built(self) -> bool :
+    return exists(abspath(join(self._options["WORKING_DIR"], self._options["TARGET"])))
+  

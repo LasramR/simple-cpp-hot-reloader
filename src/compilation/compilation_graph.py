@@ -1,6 +1,5 @@
 from __future__ import annotations
-from subprocess import run
-from typing import Set, Dict, List, Union
+from typing import Set, Dict, List, Union, Callable
 
 from ..multithreading.async_process import AsyncProcess
 from ..multithreading.async_queue import AsyncQueue
@@ -58,9 +57,9 @@ class CompilationGraph:
   _compilation_queue : AsyncQueue[CompilationGraphSimpleNode]
   _link_process : AsyncProcess
 
-  def __init__(self, options: SimpleCppHotReloaderOptions, logger: Logger):
+  def __init__(self, options: SimpleCppHotReloaderOptions, cpp : CppUtils, logger: Logger, on_build_graph_success : Union[Callable[[], None], None]):
     self._options = options
-    self._cpp = CppUtils(self._options)
+    self._cpp = cpp
 
     self._logger = logger
 
@@ -68,6 +67,8 @@ class CompilationGraph:
     self._visited = set()
     self._compilation_queue = AsyncQueue([])
     self._weighted_lock = WeightedLock()
+
+    self._on_build_graph_success = on_build_graph_success
     self._link_process = AsyncProcess(
       self._cpp.get_link_command([]),
       {
@@ -134,12 +135,12 @@ class CompilationGraph:
     new_node = CompilationGraphSimpleNode(self, key)
     self._nodes[key] = new_node
 
+    self._visit_node(new_node, disable_enqueue)
+
     if new_node.is_header:
       for node in self.get_all_nodes():
         self.update_node(node.key, disable_enqueue)
 
-    self._visit_node(new_node, disable_enqueue)
-    
     if not disable_enqueue and not new_node.is_header and not self._cpp.is_compiled(key):
       self._compilation_queue.enqueue(new_node)
     
@@ -173,18 +174,20 @@ class CompilationGraph:
     
     self._compilation_queue.remove(removed_node)
     self._weighted_lock.release(key)
-    del self.nodes[key]
+    del self._nodes[key]
   
   def move_node(self, old_key : str, new_key : str) -> CompilationGraphSimpleNode :
-    moved_node = self.get_node(new_key) or self.insert_node(new_key)
-    
-    self._visit_node(moved_node)
-
-    if removed_node := self.get_node(old_key):
-      for old_included_in_node in removed_node.included_in:
-        if self.has_node(old_included_in_node):
-          moved_node.included_in.add(old_included_in_node)
+    removed_node = self.get_node(old_key)
+    old_included_in_node = set() 
+    if removed_node:
+      old_included_in_node = removed_node.included_in.copy()
       self.remove_node(old_key)
+
+    moved_node = self.get_node(new_key) or self.insert_node(new_key, True)
+
+    for node in old_included_in_node:
+      if self.has_node(node.key):
+        moved_node.included_in.add(node)
 
     self._compilation_queue.enqueue(moved_node)
 
@@ -192,6 +195,8 @@ class CompilationGraph:
   
   def _on_link_success(self) -> None : 
     self._logger.info(f"target {self._options['TARGET']} relinked")
+    if not self._on_build_graph_success is None:
+      self._on_build_graph_success()
   
   def _on_link_error(self) -> None :
     self._logger.error(f"target {self._options['TARGET']} linking error")
