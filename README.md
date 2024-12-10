@@ -6,10 +6,56 @@ To use schr, you don't need to modify the source code of your application, you o
 
 ## Installation
 
-WIP:
-* I am working on a script to install schr from source
-* I am also looking for a way to install schr through pip
-* And I am also looking for a way to install a binary build of schr with [nuitka](https://nuitka.net/)
+### Single command
+
+You can install schr by running the following command :
+
+```sh
+git clone https://github.com/LasramR/simple-cpp-hot-reloader.git ~/.schr && chmod +x ~/.schr/_install.sh && ~/.schr/_install.sh
+```
+
+### Do it yourself
+
+You may notice that the single command installation of schr will ask you for sudo privileges. This is normal as schr is installed through [pipx](https://github.com/pypa/pipx).
+
+If you want to install schr manually (which will still require sudo privileges) to understand what is happening under the hood:
+
+* Clone schr to `.schr/` in your home (`~`) folder: 
+```sh
+git clone https://github.com/LasramR/simple-cpp-hot-reloader.git ~/.schr
+```
+
+* Install pipx:
+```sh
+sudo apt update;
+sudo apt install pipx;
+```
+
+* Install schr with pipx:
+```sh
+pipx install -e ~/.schr
+```
+
+---
+
+If the installation was successful, open a new terminal and run :
+
+```sh
+schr -h
+```
+
+It should output:
+
+```
+usage: schr
+
+Simple CPP Hot Reloader (schr)
+
+...
+```
+
+
+Note: I am looking for a way to install a binary build of schr with [nuitka](https://nuitka.net/)
 
 ## Usage
 
@@ -108,6 +154,20 @@ schr -c g++ -cf="-std=c++20 -I./src" -lf="-lvulkan" -od "./bin" -t myvulkanapp -
 If you don't want schr to restart your project after each execution, you can change schr behavior to "Compilation" only by using the **-m**,**--mode** flag as follows : **-m C**,**--mode C**.
 
 If you never ran schr with your project, it will compile and link your project for the first time to create a compilation cache.
+
+## Uninstall schr
+
+To uninstall schr, run the following command:
+
+```sh
+~/.schr/_uninstall.sh
+```
+
+Note: if you have installed schr without a single command, be sure that `~/.schr/_uninstall.sh` is executable with:
+
+```sh
+chmod +x ~/.schr/_uninstall.sh
+```
 
 ## Improvements 
 
