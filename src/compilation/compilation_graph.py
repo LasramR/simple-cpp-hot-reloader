@@ -1,4 +1,5 @@
 from __future__ import annotations
+from threading import Thread, Lock
 from typing import Set, Dict, List, Union, Callable
 
 from ..multithreading.async_process import AsyncProcess
@@ -72,6 +73,7 @@ class CompilationGraph:
     self._logger = logger
 
     self._nodes = {}
+    self._nodes_lock = Lock()
     self._visited = set()
     self._compilation_queue = AsyncQueue([])
     self._weighted_lock = WeightedLock()
@@ -89,31 +91,51 @@ class CompilationGraph:
     keys_to_visit = self._cpp.get_cpp_source_file()
     if len(keys_to_visit) >= 25:
       self._logger.warn(f"{len(keys_to_visit)} files to resolve, this may take some time...")
-    while len(keys_to_visit):
-      key = keys_to_visit.pop()
-      if key in self._visited or self._cpp.is_external_include(key):
-        continue
-      
-      new_node = self.get_node(key) or self.insert_node(key, True)
 
-      keys_to_visit = [*keys_to_visit, *[node.key for node in new_node.includes]]
+    while len(keys_to_visit):
+      visited_keys = []
+      max_parallel_visit = 8
+      i = 0
+      while len(keys_to_visit) and i < max_parallel_visit:
+        key = keys_to_visit.pop()
+        if key in self._visited or self._cpp.is_external_include(key):
+          continue
+        visited_keys.append(key)
+        i += 1
+      
+      visited_nodes = []
+      visited_nodes_lock = Lock()
+      visit_threads = []
+
+      for key in visited_keys:
+        t = Thread(target=self._visit_async, args=(key, visited_nodes, visited_nodes_lock))
+        visit_threads.append(t)
+        t.start()
+      for t in visit_threads:
+        t.join()
+
+      for new_node in visited_nodes:
+        keys_to_visit = [*keys_to_visit, *[node.key for node in new_node.includes]]
 
     for node in self.get_all_non_header_nodes():
       if not self._cpp.is_compiled(node.key):
         self._compilation_queue.enqueue(node)
 
   def has_node(self, key : str) -> bool :
-    return key in self._nodes
+    with self._nodes_lock:
+      return key in self._nodes
 
   def get_node(self, key : str) -> Union[CompilationGraphSimpleNode, None] :
     if self.has_node(key):
-      return self._nodes[key]
+      with self._nodes_lock:
+        return self._nodes[key]
     return None
   
   def get_all_nodes(self) -> List[CompilationGraphSimpleNode]:
     all_nodes = []
-    for k in self._nodes:
-      all_nodes.append(self._nodes[k])
+    with self._nodes_lock:
+      for k in self._nodes:
+        all_nodes.append(self._nodes[k])
     return all_nodes
   
   def get_all_header_nodes(self) -> List[CompilationGraphSimpleNode] :
@@ -124,6 +146,11 @@ class CompilationGraph:
 
   def get_all_sub_nodes(self, key_prefix : str) -> List[CompilationGraphSimpleNode] :
     return list(filter(lambda n : n.key.startswith(key_prefix), self.get_all_nodes()))
+
+  def _visit_async(self, key : str, visited_nodes : List[CompilationGraphSimpleNode], visited_nodes_lock : Lock) -> None:
+    new_node = self.get_node(key) or self.insert_node(key, True)
+    with visited_nodes_lock:
+      visited_nodes.append(new_node)
 
   def _visit_node(self, node : CompilationGraphSimpleNode, disable_enqueue : bool = False) -> CompilationGraphSimpleNode :
     links = self._cpp.get_source_includes(node.key)    
@@ -143,7 +170,9 @@ class CompilationGraph:
 
   def insert_node(self, key : str, disable_enqueue : bool = False) -> CompilationGraphSimpleNode :
     new_node = CompilationGraphSimpleNode(self, key)
-    self._nodes[key] = new_node
+
+    with self._nodes_lock:
+      self._nodes[key] = new_node
 
     self._visit_node(new_node, disable_enqueue)
 
@@ -186,7 +215,9 @@ class CompilationGraph:
     
     self._compilation_queue.remove(removed_node)
     self._weighted_lock.release(key)
-    del self._nodes[key]
+
+    with self._nodes_lock:
+      del self._nodes[key]
   
   def move_node(self, old_key : str, new_key : str) -> CompilationGraphSimpleNode :
     removed_node = self.get_node(old_key)
