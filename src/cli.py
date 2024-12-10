@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 from argparse import ArgumentParser, Action, Namespace, RawTextHelpFormatter
 from os import getcwd
 from sys import argv
