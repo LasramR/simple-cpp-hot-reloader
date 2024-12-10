@@ -52,7 +52,8 @@ class HotReloader(RegexMatchingEventHandler):
   def _on_compilation_graph_build_success(self) -> None:
     self._compilation_cache.write_to_cache_file()
     if 'R' in self._options["MODE"]:
-      self._target_process.terminate_and_run()
+      if self._cpp.is_target_built():
+        self._target_process.terminate_and_run()
 
   def on_created(self, fse: DirCreatedEvent | FileCreatedEvent) -> None:
     if not self._cpp.is_cpp_source_file(fse.src_path):
@@ -122,8 +123,7 @@ class HotReloader(RegexMatchingEventHandler):
 
     if self._options["MODE"] == "R":
       self._logger.warn("you are using R (Run) mode only. This will only start your target once and only if it is already compiled. If that’s all you’re after, then you're all set—no compilation, no re-linking, just a good old execution!")
-      if self._cpp.is_target_built():
-        self._on_compilation_graph_build_success() 
+      self._on_compilation_graph_build_success() 
 
     if "C" in self._options["MODE"]:
       self._compilation_graph.build(False) or self._on_compilation_graph_build_success() 
