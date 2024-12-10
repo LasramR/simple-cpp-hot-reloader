@@ -19,6 +19,8 @@ class HotReloader(RegexMatchingEventHandler):
     self._cpp = CppUtils(self._options)
     self._logger = Logger(LoggerOptions.DefaultWithName("schr"))
 
+    signal(SIGINT, lambda _a, _b: print() or exit(-1))
+
     self._target_logger = Logger({"NAME": self._options["TARGET"], "SUCCESS_COLOR": "GREEN", "INFO_COLOR": "WHITE", "ERROR_COLOR": "MAGENTA", "WARN_COLOR": "CYAN"})
     self._target_process = AsyncProcess(
       self._cpp.get_target_command(),

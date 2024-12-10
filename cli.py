@@ -97,5 +97,4 @@ if __name__ == "__main__":
     print(as_makefile(hot_reloader_options))
     exit(0)
 
-  print(hot_reloader_options)
   HotReloader(hot_reloader_options).start()
