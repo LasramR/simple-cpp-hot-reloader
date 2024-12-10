@@ -1,6 +1,6 @@
 # Simple CPP Hot Reloader
 
-Simple CPP Hot Reloader or in shorter terms "schr", is a configurationless, stateless hot reloader for C and CPP projects.
+Simple CPP Hot Reloader or in shorter terms "schr", is a configurationless, stateless hot reloader for C and CPP projects without the use of an IDE.
 
 To use schr, you don't need to modify the source code of your application, you only need to tell schr what it needs to build your project.
 
