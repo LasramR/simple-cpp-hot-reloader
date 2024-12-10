@@ -4,7 +4,7 @@ Simple CPP Hot Reloader or in shorter terms "schr", is a configurationless, stat
 
 To use schr, you don't need to modify the source code of your application, you only need to tell schr what it needs to build your project.
 
-## Installation
+## Installation (Unix)
 
 ### Single command
 
