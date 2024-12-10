@@ -87,6 +87,8 @@ class CompilationGraph:
     )
 
     keys_to_visit = self._cpp.get_cpp_source_file()
+    if len(keys_to_visit) >= 25:
+      self._logger.warn(f"{len(keys_to_visit)} files to resolve, this may take some time...")
     while len(keys_to_visit):
       key = keys_to_visit.pop()
       if key in self._visited or self._cpp.is_external_include(key):
