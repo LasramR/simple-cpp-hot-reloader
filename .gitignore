@@ -1,6 +1,7 @@
 # Python stuff
 .venv/
 __pycache__/
+*.egg-info
 
 # CPP stuff
 *.cpp

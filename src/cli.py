@@ -5,9 +5,9 @@ from os import getcwd
 from sys import argv
 from typing import List
 
-from src.hot_reloader import HotReloader
-from src.utils.cmd import is_valid_command
-from src.options import SimpleCppHotReloaderOptions, as_makefile
+from schr.hot_reloader import HotReloader
+from schr.utils.cmd import is_valid_command
+from schr.options import SimpleCppHotReloaderOptions, as_makefile
 
 class EqualAssignedArgument(Action):
 
@@ -58,7 +58,7 @@ class ModeCharactersCombination (AlphabeticalCharactersCombinationArgument):
   LOWER_DEFAULT = False
 
 
-if __name__ == "__main__":
+def main():
   argsParser = ArgumentParser(usage="schr", description="Simple CPP Hot Reloader (schr)", formatter_class=RawTextHelpFormatter)
   argsParser.add_argument("-c", "--compiler", help="C/C++ compiler executable to use (eg gcc, g++, clang, ...)?\ndefaults to g++", required=False)
   argsParser.add_argument("-cf", "--cflags", action=EqualAssignedArgument, metavar='="CFLAGS ..."', help='Sets additional flags for the C/C++ compiler (eg -std=c++20, -Wall, ...).\nMust be used with direct affectation and quoted strings (eg -cf="-std=c++20 ...")', required=False)
@@ -98,3 +98,6 @@ if __name__ == "__main__":
     exit(0)
 
   HotReloader(hot_reloader_options).start()
+
+if __name__ == "__main__":
+  main()

@@ -14,8 +14,7 @@ class SimpleCppHotReloaderOptions(TypedDict):
   DEBUG: bool
 
 def as_makefile(options : SimpleCppHotReloaderOptions) -> str:
-    return f"""
-CXX="{options["CXX"]}"
+    return f"""CXX="{options["CXX"]}"
 CFLAGS="{options["CFLAGS"]}"
 LDFLAGS="{options["LDFLAGS"]}"
 OBJ_DIR="{options["OBJ_DIR"]}"
