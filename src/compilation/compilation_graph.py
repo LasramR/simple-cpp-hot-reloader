@@ -107,13 +107,13 @@ class CompilationGraph:
     return all_nodes
   
   def get_all_header_nodes(self) -> List[CompilationGraphSimpleNode] :
-    return filter(lambda n : n.is_header, self.get_all_nodes())
+    return list(filter(lambda n : n.is_header, self.get_all_nodes()))
   
   def get_all_non_header_nodes(self) -> List[CompilationGraphSimpleNode] :
-    return filter(lambda n : not n.is_header, self.get_all_nodes())
+    return list(filter(lambda n : not n.is_header, self.get_all_nodes()))
 
   def get_all_sub_nodes(self, key_prefix : str) -> List[CompilationGraphSimpleNode] :
-    return filter(lambda n : n.key.startswith(key_prefix), self.get_all_nodes())
+    return list(filter(lambda n : n.key.startswith(key_prefix), self.get_all_nodes()))
 
   def _visit_node(self, node : CompilationGraphSimpleNode, disable_enqueue : bool = False) -> CompilationGraphSimpleNode :
     links = self._cpp.get_source_includes(node.key)    
@@ -193,6 +193,10 @@ class CompilationGraph:
 
     return moved_node
   
+  def mark_node_as_outdated(self, node : CompilationGraphSimpleNode):
+    if self.has_node(node.key):
+      self._compilation_queue.enqueue(node)
+  
   def _on_link_success(self) -> None : 
     self._logger.info(f"target {self._options['TARGET']} relinked")
     if not self._on_build_graph_success is None:
@@ -208,9 +212,12 @@ class CompilationGraph:
       self._link_process.terminate()
       self._link_process.run_with_command(command)
 
-  def build(self):
+  def build(self) -> bool:
+    rebuild = False
     for node in self._compilation_queue.consume_queue():
       node.recompile()
+      rebuild = True
+    return rebuild
 
     
   

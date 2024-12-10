@@ -1,72 +1,63 @@
 from hashlib import blake2b
 from os import path
-from typing import List, Union
+from typing import List
 
-class CompilationCacheArtifact:
+from ..compilation.compilation_graph import CompilationGraph, CompilationGraphSimpleNode
 
-  def __init__(self, file_path : str, file_hash : Union[str, None] = None):
-    self.file_path = file_path
-    self.hash_cache = self.hash() if file_hash == None else file_hash
+class CompilationCacheNode:
 
-  def hash(self):
-    file_hash = blake2b()
-    with open(self.file_path, "rb") as fd:
+  def __init__(self, node : CompilationGraphSimpleNode):
+    self._node = node
+    self._node_hash = self._hash()
+
+  def _hash(self):
+    hash = blake2b()
+    with open(self._node.key, "rb") as fd:
       while chunk := fd.read(8192):
-        file_hash.update(chunk)
-    return file_hash.digest().hex()
+        hash.update(chunk)
+    return hash.digest().hex()
   
-  def is_up_to_date(self):
-    return self.hash_cache == self.hash()
-  
-  def update(self):
-    self.hash_cache = self.hash()
+  def is_up_to_date(self) -> bool:
+    return self._node_hash == self._hash()
+
+  def update(self) -> None:
+    self._node_hash = self._hash()
 
 class CompilationCache:
 
-  def __init__(self, compilation_cache_file_path : str, watched_file_paths : List[str]):
-    self.compilation_cache_file_path = compilation_cache_file_path
-    self.old_cache_table = {cca.file_path: cca for cca in self.read_cache_file()}
-    self.cache_table = {wfp: CompilationCacheArtifact(wfp) for wfp in watched_file_paths}
+  def __init__(self, compilation_graph : CompilationGraph, compilation_cache_file_path : str):
+    self._compilation_cache_file_path = compilation_cache_file_path
+    self._cache_table = {node.key: CompilationCacheNode(node) for node in compilation_graph.get_all_nodes()}
 
-  def read_cache_file(self) -> List[CompilationCacheArtifact]:
-    if not path.exists(self.compilation_cache_file_path):
-      return []
+  def insert_node(self, node : CompilationGraphSimpleNode) -> None :
+    self._cache_table[node.key] = CompilationCacheNode(node)
 
-    artifacts = []
-    with open(self.compilation_cache_file_path, "r") as fd:
-      for line in fd.readlines():
-        file_path, file_hash = line.replace("\n", "").split(":")
-        artifacts.append(CompilationCacheArtifact(file_path, file_hash))
-    return artifacts
+  def remove_node(self, node_key : str) -> None :
+    del self._cache_table[node_key]
 
-  def remove_entry(self, artifact_path : str) -> None :
-    if artifact_path in self.cache_table:
-      del self.cache_table[artifact_path]
+  def update_node(self, node_key : str) -> None :
+    self._cache_table[node_key].update()
 
-  def update_entry(self, artifact_path : str) -> None :
-    if artifact_path in self.cache_table:
-      self.cache_table[artifact_path].update()
+  def move_node(self, old_node_key : str, new_node : CompilationGraphSimpleNode) -> None:
+    self.remove_node(old_node_key)
+    self.insert_node(new_node)
 
-  def add_entry(self, artifact_path : str) -> None :
-    if not artifact_path in self.cache_table:
-      self.cache_table[artifact_path] = CompilationCacheArtifact(artifact_path)
+  def is_node_up_to_date(self, node_key : str) -> None :
+    return node_key in self._cache_table and self._cache_table[node_key].is_up_to_date()
 
-  def move_entry(self, old_artifact_path : str, new_artifact_path : str) -> None:
-    self.remove_entry(old_artifact_path)
-    self.add_entry(new_artifact_path)
+  def get_all_outdated_nodes(self) -> List[CompilationGraphSimpleNode]:
+    outdated_nodes = set(self._cache_table.keys())
 
-  def get_all_outdated_artifacts(self) -> List[CompilationCacheArtifact]:
-    outdated = []
-    for cca in self.cache_table:
-      if not (cca in self.old_cache_table and self.old_cache_table[cca].hash_cache == self.cache_table[cca].hash_cache):
-        outdated.append(self.cache_table[cca])
-    return outdated
+    if path.exists(self._compilation_cache_file_path):
+      with open(self._compilation_cache_file_path, "r") as fd:
+        for line in fd.readlines():
+          node_key, node_hash = line.replace("\n", "").split(":")
+          if node_key in self._cache_table and self._cache_table[node_key]._node_hash == node_hash:
+            outdated_nodes.remove(node_key)
 
-  def dump(self):
-    with open(self.compilation_cache_file_path, "w") as fd:
-      for cca in self.cache_table:
-        try:
-          fd.write(f"{cca}:{self.cache_table[cca].hash()}\n")
-        except:
-          pass
-    self.old_cache_table = self.cache_table
+    return [self._cache_table[node_key]._node for node_key in outdated_nodes]
+
+  def write_to_cache_file(self):
+    with open(self._compilation_cache_file_path, "w") as fd:
+      for node_key in self._cache_table:
+        fd.write(f"{node_key}:{self._cache_table[node_key]._node_hash}\n")

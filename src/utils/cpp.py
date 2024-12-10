@@ -1,4 +1,4 @@
-from os import sep, makedirs
+from os import sep, makedirs, remove, listdir, rmdir
 from os.path import abspath, exists, dirname, join
 from re import match
 from typing import List
@@ -47,9 +47,27 @@ class CppUtils  :
       return change_file_ext(cpp_source_path, ".o")
     return f"{self._options['OBJ_DIR']}{sep}{change_file_ext(get_relative_path_from(self._options['WORKING_DIR'], cpp_source_path), '.o')}"
 
+  def get_object_file_dir(self, cpp_source_path : str) -> str :
+    return dirname(get_relative_path_from(self._options["WORKING_DIR"], self.get_object_file_path(cpp_source_path)))
+
   def create_object_file_dir(self, cpp_source_path : str) -> None :
     if len(self._options["OBJ_DIR"]):
-      makedirs(dirname(get_relative_path_from(self._options["WORKING_DIR"], self.get_object_file_path(cpp_source_path))), exist_ok=True)    
+      makedirs(self.get_object_file_dir(cpp_source_path), exist_ok=True)    
+
+  def clean_object_file(self, cpp_source_path : str) -> None :
+    cpp_object_file_path = self.get_object_file_path(cpp_source_path)
+    cpp_object_file_dir = self.get_object_file_dir(cpp_source_path)
+
+    try:
+      remove(cpp_object_file_path)
+    except:
+      pass
+
+    try:
+      if len(self._options["OBJ_DIR"]) and len(listdir(cpp_object_file_dir)) == 0:
+        rmdir(cpp_object_file_dir)
+    except:
+      pass
 
   def get_cpp_command(self, cpp_source_path : str) -> List[str] :
     return [
@@ -100,3 +118,5 @@ class CppUtils  :
   def is_target_built(self) -> bool :
     return exists(abspath(join(self._options["WORKING_DIR"], self._options["TARGET"])))
   
+  def get_compilation_cache_file_path(self) -> str :
+    return f"{self._options['WORKING_DIR']}{sep}.schr.cache"
