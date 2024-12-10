@@ -29,8 +29,8 @@ git clone https://github.com/LasramR/simple-cpp-hot-reloader.git ~/.schr
 
 * Install pipx:
 ```sh
-sudo apt update;
-sudo apt install pipx;
+sudo apt update
+sudo apt install pipx
 ```
 
 * Install schr with pipx:
@@ -172,8 +172,6 @@ chmod +x ~/.schr/_uninstall.sh
 ```
 
 ## Improvements 
-
-* Slow start: I tested schr on a cpp vulkan project with over 60+ (long) files, schr needed at least 20-30 seconds to boot. Even though I am coding on a potato, the initial dependency graph computation could be sped up using multithreading.
 * Proper testing: schr is considered stable because it works on my machine. Ideally, I will write unit tests to confirm my thought.
 * Maximum parallel operations: add a flag to restrict the maximum number of parallel operations
-* Select specifc c preprocessor : add a flag to specify which c pre processor to use when parsing dependencies
+* Select specific C preprocessor: add a flag to specify which C preprocessor to use when parsing dependencies
