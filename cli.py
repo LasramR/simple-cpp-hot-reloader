@@ -60,15 +60,15 @@ class ModeCharactersCombination (AlphabeticalCharactersCombinationArgument):
 
 if __name__ == "__main__":
   argsParser = ArgumentParser(description="Simple CPP Hot Reloader (schr)", formatter_class=RawTextHelpFormatter)
-  argsParser.add_argument("-c", "--compiler", help="C compiler executable\ndefaults to g++", required=False)
-  argsParser.add_argument("-cf", "--cflags", action=EqualAssignedArgument, metavar='="CFLAGS ..."', help='CPP Compiler flags, use it with direct affectation and quoted strings (e.g. "-cf=-std=c++20")', required=False)
-  argsParser.add_argument("-ld", "--ldflags", action=EqualAssignedArgument, metavar='="LFLAGS ..."', help='CPP Compiler linker flags, use it with direct affectation and quoted strings (e.g. "-ld=-lpthread")', required=False)
-  argsParser.add_argument("-od", "--obj-dir", help="Object files output directory\nby defaults, compilation artifacts (i.e. object files) will be outputed next to the source code", required=False)
-  argsParser.add_argument("-t", "--target", help="Target executable name", required=True)
-  argsParser.add_argument("-ta", "--target-args", action=EqualAssignedArgument, metavar='="TARGET_ARGS ..."', help="Arguments passed to target when restarted", required=False)
-  argsParser.add_argument("-m", "--mode", action=ModeCharactersCombination, help='A combination of characters describing the hot reloader behaviour:\n\tC - Automatically recompile on changes\n\tR - Restart the target after each build\ne.g. "-m CR" will enable both automatic compilation and restart\ndefaults to "CR"', required=False)
-  argsParser.add_argument("-d", "--debug", action='store_true', help="Enable debug mode. Compilation commands will be printed", required=False)
-  argsParser.add_argument("--makefile", action='store_true', help="Print the source code of a makefile that can be used to execute schr with the provided arguments", required=False)
+  argsParser.add_argument("-c", "--compiler", help="C/C++ compiler executable to use (eg gcc, g++, clang, ...)?\ndefaults to g++", required=False)
+  argsParser.add_argument("-cf", "--cflags", action=EqualAssignedArgument, metavar='="CFLAGS ..."', help='Sets additional flags for the C/C++ compiler (eg -std=c++20, -Wall, ...).\nMust be used with direct affectation and quoted strings (eg -cf="-std=c++20 ...")', required=False)
+  argsParser.add_argument("-lf", "--lflags", action=EqualAssignedArgument, metavar='="LFLAGS ..."', help='Sets additional flags for the C/C++ linker (eg -lpthread, -lvulkan, ...).\nMust be used with direct affectation and quoted strings (eg -lf="-lpthread ...")', required=False)
+  argsParser.add_argument("-od", "--obj-dir", help="Specifies the directory where object files (*.o) should be stored.\n If not provided, object files are outputed to the source code", required=False)
+  argsParser.add_argument("-t", "--target", help="The path for the built executable of your project", required=True)
+  argsParser.add_argument("-ta", "--target-args", action=EqualAssignedArgument, metavar='="TARGET_ARGS ..."', help='Command-line arguments to pass to your built executable when it is restarted by schr.\nMust be used with direct affectation and quoted strings (eg -ta="-myflag value ...")', required=False)
+  argsParser.add_argument("-m", "--mode", action=ModeCharactersCombination, help='Configures schr behavior using a set of mode characters\n\tC - Automatically recompile on changes\n\tR - Restart the target after each build\ne.g. "-m CR" will enable both automatic compilation and restart\ndefaults to "CR"', required=False)
+  argsParser.add_argument("-d", "--debug", action='store_true', help="Enable schr debug mode which displays compiler/linker commands during execution\ndisabled by default", required=False)
+  argsParser.add_argument("--makefile", action='store_true', help="Outputs the source code for a makefile that can be used to invoke schr with the specified arguments\ndisabled by default", required=False)
   args = argsParser.parse_args()
 
   hot_reloader_options = SimpleCppHotReloaderOptions({

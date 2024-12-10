@@ -25,6 +25,7 @@ TARGET_ARGS="{options["TARGET_ARGS"]}"
 SCHR_MODE={options["MODE"]}
 SCHR_DEBUG={"-d" if options["DEBUG"] else ""}
 
+# Run the following with make dev
 dev:
 \tpython ./cli.py -c $(CXX) -cf=$(CFLAGS) -ld=$(LDFLAGS) -od $(OBJ_DIR) -t $(TARGET) -ta=$(TARGET_ARGS) -m $(SCHR_MODE) $(SCHR_DEBUG)
 """
