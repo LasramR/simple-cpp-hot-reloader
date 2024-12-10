@@ -113,3 +113,5 @@ If you never ran schr with your project, it will compile and link your project f
 
 * Slow start: I tested schr on a cpp vulkan project with over 60+ (long) files, schr needed at least 20-30 seconds to boot. Even though I am coding on a potato, the initial dependency graph computation could be sped up using multithreading.
 * Proper testing: schr is considered stable because it works on my machine. Ideally, I will write unit tests to confirm my thought.
+* Maximum parallel operations: add a flag to restrict the maximum number of parallel operations
+* Select specifc c preprocessor : add a flag to specify which c pre processor to use when parsing dependencies
