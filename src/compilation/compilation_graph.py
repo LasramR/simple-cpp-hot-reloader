@@ -11,7 +11,9 @@ from ..options import SimpleCppHotReloaderOptions
 class CompilationGraphSimpleNode:
 
   _compilation_process : Union[AsyncProcess, None] = None
-
+  includes: Set[CompilationGraphSimpleNode]
+  included_in: Set[CompilationGraphSimpleNode]
+  
   def __init__(self, compilation_graph : CompilationGraph, key : str):
     self._compilation_graph = compilation_graph
     self.key = key
@@ -44,13 +46,16 @@ class CompilationGraphSimpleNode:
     self._compilation_graph._compilation_queue.enqueue(self)
 
   def recompile(self) -> None:
-    if self.is_header:
-      for node in self.included_in:
-        node.recompile()
-    elif not self.is_up_to_date:
-      self._compilation_graph._weighted_lock.acquire(self.key)
-      self._compilation_graph._cpp.create_object_file_dir(self.key)
-      self._compilation_process.terminate_and_run()
+    if not self.is_up_to_date:
+      if self.is_header:
+        for node in self.included_in:
+          node.is_up_to_date = False
+          node.recompile()
+        self.is_up_to_date = True
+      else:
+        self._compilation_graph._weighted_lock.acquire(self.key)
+        self._compilation_graph._cpp.create_object_file_dir(self.key)
+        self._compilation_process.terminate_and_run()
 
 class CompilationGraph:
 
@@ -117,7 +122,7 @@ class CompilationGraph:
   def get_all_sub_nodes(self, key_prefix : str) -> List[CompilationGraphSimpleNode] :
     return list(filter(lambda n : n.key.startswith(key_prefix), self.get_all_nodes()))
 
-  def _visit_node(self, node : CompilationGraphSimpleNode, disable_enqueue : bool = False, mark_node_out_of_date : bool = False) -> CompilationGraphSimpleNode :
+  def _visit_node(self, node : CompilationGraphSimpleNode, disable_enqueue : bool = False) -> CompilationGraphSimpleNode :
     links = self._cpp.get_source_includes(node.key)    
 
     for l in links:
@@ -125,17 +130,11 @@ class CompilationGraph:
         continue
       
       link_node = self.get_node(l) or self.insert_node(l, disable_enqueue)
-      
-      if mark_node_out_of_date:
-        link_node.is_up_to_date = False
 
       link_node.included_in.add(node)
       node.includes.add(link_node)
 
     self._visited.add(node.key)
-
-    if mark_node_out_of_date:
-      node.is_up_to_date = False
 
     return node
 
@@ -161,8 +160,10 @@ class CompilationGraph:
     updated_node = self.get_node(key)
     
     updated_node.includes.clear()
-    self._visit_node(updated_node, disable_enqueue, True)
+    self._visit_node(updated_node, disable_enqueue)
     
+    updated_node.is_up_to_date = False
+
     if not disable_enqueue:
       self._compilation_queue.enqueue(updated_node)
 
@@ -197,6 +198,7 @@ class CompilationGraph:
       if self.has_node(node.key):
         moved_node.included_in.add(node)
 
+    moved_node.is_up_to_date = False
     self._compilation_queue.enqueue(moved_node)
 
     return moved_node
