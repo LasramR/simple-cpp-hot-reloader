@@ -75,7 +75,7 @@ if __name__ == "__main__":
     "WORKING_DIR": getcwd(),
     "CXX": "g++",
     "CFLAGS": args.cflags or "",
-    "LDFLAGS": args.ldflags or "",
+    "LDFLAGS": args.lflags or "",
     "OBJ_DIR": "",
     "CXX_FILE_EXTS": [".cpp", ".cc", ".c"],
     "HXX_FILE_EXTS": [".hpp", ".h"],
