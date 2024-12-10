@@ -17,6 +17,7 @@ ColorReset = "\033[0m"
 class LoggerOptions (TypedDict):
 
   NAME: Union[str, None]
+  SUCCESS_COLOR: Union[Color, None]
   INFO_COLOR: Union[Color, None]
   ERROR_COLOR: Union[Color, None]
   WARN_COLOR: Union[Color, None] 
@@ -25,6 +26,7 @@ class LoggerOptions (TypedDict):
   def DefaultWithName(name : Union[str, None]) -> LoggerOptions:
     return {
       "NAME": name,
+      "SUCCESS_COLOR": "GREEN",
       "INFO_COLOR": "BLUE",
       "WARN_COLOR": "YELLOW",
       "ERROR_COLOR": "RED"
@@ -39,6 +41,9 @@ class Logger:
   def __init__(self, options : LoggerOptions) -> None:
     self.options = options
   
+  def success(self, log : str) -> None:
+    print(f"{ColorTable[self.options["SUCCESS_COLOR"]]}{"" if self.options["NAME"] is None else f"[{self.options["NAME"]}] "}{log}{ColorReset}")
+
   def info(self, log : str) -> None:
     print(f"{ColorTable[self.options["INFO_COLOR"]]}{"" if self.options["NAME"] is None else f"[{self.options["NAME"]}] "}{log}{ColorReset}")
 

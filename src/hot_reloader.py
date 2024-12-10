@@ -19,7 +19,7 @@ class HotReloader(RegexMatchingEventHandler):
     self._cpp = CppUtils(self._options)
     self._logger = Logger(LoggerOptions.DefaultWithName("schr"))
 
-    self._target_logger = Logger({"NAME": self._options["TARGET"], "INFO_COLOR": "WHITE", "ERROR_COLOR": "MAGENTA", "WARN_COLOR": "CYAN"})
+    self._target_logger = Logger({"NAME": self._options["TARGET"], "SUCCESS_COLOR": "GREEN", "INFO_COLOR": "WHITE", "ERROR_COLOR": "MAGENTA", "WARN_COLOR": "CYAN"})
     self._target_process = AsyncProcess(
       self._cpp.get_target_command(),
       {
@@ -30,11 +30,17 @@ class HotReloader(RegexMatchingEventHandler):
       }
     )
 
+    self._logger.info(f"computing include graph of project \"{self._options['WORKING_DIR']}\"")
     self._compilation_graph = CompilationGraph(self._options, self._cpp, self._logger, self._on_compilation_graph_build_success)
+    self._logger.success(f"ok")
+
+    self._logger.info(f"initializing cshr cache with \"{self._cpp.get_compilation_cache_file_path()}\"")
     self._compilation_cache = CompilationCache(self._compilation_graph, self._cpp.get_compilation_cache_file_path())
+    self._logger.success(f"ok")
 
     try:
       for outdated_node in self._compilation_cache.get_all_outdated_nodes():
+        self._logger.warn(f"{outdated_node.key} seems out of date and will be recompiled")
         self._compilation_graph.mark_node_as_outdated(outdated_node)
     except:
       self._logger.error("could not read cache file correctly")
@@ -110,16 +116,24 @@ class HotReloader(RegexMatchingEventHandler):
       self._compilation_graph.build()
 
   def start(self):
+    self._logger.info(f"running first round")
+
     if self._options["MODE"] == "R":
-      self._logger.warn("You are using R (Run) mode only. This will only start your target once and only if it is already compiled. If that’s all you’re after, then you're all set—no compilation, no re-linking, just a good old execution!")
+      self._logger.warn("you are using R (Run) mode only. This will only start your target once and only if it is already compiled. If that’s all you’re after, then you're all set—no compilation, no re-linking, just a good old execution!")
       if self._cpp.is_target_built():
         self._on_compilation_graph_build_success() 
 
     if "C" in self._options["MODE"]:
       self._compilation_graph.build() or self._on_compilation_graph_build_success() 
 
+    self._logger.success(f"ok")
+
+
+    self._logger.info(f"watching project \"{self._options['WORKING_DIR']}\"")
     observer = Observer()
     observer.schedule(self, self._options["WORKING_DIR"], recursive=True)
     observer.start()
     signal(SIGINT, lambda _a, _b: observer.stop() or print())
+    self._logger.success("ok")
+
     observer.join()
