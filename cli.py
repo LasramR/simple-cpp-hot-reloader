@@ -59,7 +59,7 @@ class ModeCharactersCombination (AlphabeticalCharactersCombinationArgument):
 
 
 if __name__ == "__main__":
-  argsParser = ArgumentParser(description="Simple CPP Hot Reloader (schr)", formatter_class=RawTextHelpFormatter)
+  argsParser = ArgumentParser(usage="schr", description="Simple CPP Hot Reloader (schr)", formatter_class=RawTextHelpFormatter)
   argsParser.add_argument("-c", "--compiler", help="C/C++ compiler executable to use (eg gcc, g++, clang, ...)?\ndefaults to g++", required=False)
   argsParser.add_argument("-cf", "--cflags", action=EqualAssignedArgument, metavar='="CFLAGS ..."', help='Sets additional flags for the C/C++ compiler (eg -std=c++20, -Wall, ...).\nMust be used with direct affectation and quoted strings (eg -cf="-std=c++20 ...")', required=False)
   argsParser.add_argument("-lf", "--lflags", action=EqualAssignedArgument, metavar='="LFLAGS ..."', help='Sets additional flags for the C/C++ linker (eg -lpthread, -lvulkan, ...).\nMust be used with direct affectation and quoted strings (eg -lf="-lpthread ...")', required=False)
