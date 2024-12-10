@@ -97,7 +97,8 @@ class CppUtils  :
     ]
 
     includes = list(map(lambda f : abspath(f), run_piped_command(commands)))
-    includes.remove(cpp_source_path)
+    if len(includes):
+      includes.remove(cpp_source_path)
     return includes
   
   def is_user_include(self, cpp_include : str) -> bool :

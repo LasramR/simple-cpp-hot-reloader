@@ -51,13 +51,10 @@ class HotReloader(RegexMatchingEventHandler):
       return
     
     node_key = fse.src_path
-    node = self._compilation_graph.insert_node(node_key)
+    node = self._compilation_graph.insert_node(node_key, True)
     self._compilation_cache.insert_node(node)
     
     self._logger.info(f"{node.key} created")
-    
-    if "C" in self._options["MODE"]:
-      self._compilation_graph.build()
 
   def on_deleted(self, fse: DirDeletedEvent | FileDeletedEvent) -> None:
     deleted_nodes = []
