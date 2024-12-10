@@ -89,8 +89,6 @@ class CompilationGraph:
     )
 
     keys_to_visit = self._cpp.get_cpp_source_file()
-    if len(keys_to_visit) >= 25:
-      self._logger.warn(f"{len(keys_to_visit)} files to resolve, this may take some time...")
 
     while len(keys_to_visit):
       visited_keys = []
@@ -102,7 +100,9 @@ class CompilationGraph:
           continue
         visited_keys.append(key)
         i += 1
-      
+
+      self._logger.warn(f"{len(keys_to_visit) + i} files to resolve left...")
+
       visited_nodes = []
       visited_nodes_lock = Lock()
       visit_threads = []
