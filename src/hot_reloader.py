@@ -126,7 +126,7 @@ class HotReloader(RegexMatchingEventHandler):
         self._on_compilation_graph_build_success() 
 
     if "C" in self._options["MODE"]:
-      self._compilation_graph.build() or self._on_compilation_graph_build_success() 
+      self._compilation_graph.build(False) or self._on_compilation_graph_build_success() 
 
     self._logger.success(f"ok")
 

@@ -45,12 +45,13 @@ class CompilationGraphSimpleNode:
     self._compilation_graph._weighted_lock.release(self.key)
     self._compilation_graph._compilation_queue.enqueue(self)
 
-  def recompile(self) -> None:
+  def recompile(self, outdate_included_in : bool = True) -> None:
     if not self.is_up_to_date:
       if self.is_header:
         for node in self.included_in:
-          node.is_up_to_date = False
-          node.recompile()
+          if outdate_included_in:
+            node.is_up_to_date = False
+          node.recompile(outdate_included_in)
         self.is_up_to_date = True
       else:
         self._compilation_graph._weighted_lock.acquire(self.key)
@@ -223,12 +224,9 @@ class CompilationGraph:
       self._link_process.terminate()
       self._link_process.run_with_command(command)
 
-  def build(self) -> bool:
+  def build(self, outdate_included_in : bool = True) -> bool:
     rebuild = False
     for node in self._compilation_queue.consume_queue():
-      node.recompile()
+      node.recompile(outdate_included_in)
       rebuild = True
     return rebuild
-
-    
-  
