@@ -6,7 +6,7 @@ To use schr, you don't need to modify the source code of your application, you o
 
 **schr only works on Unix systems (ie not Windows).**
 
-## Installation
+## Installation (Ubuntu/Deb)
 
 ### Single command
 
